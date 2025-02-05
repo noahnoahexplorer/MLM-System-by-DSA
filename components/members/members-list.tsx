@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -9,232 +12,142 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, Calendar } from "lucide-react";
-import { DailyCommission, ReferralNetwork } from "@/lib/types";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { subMonths } from "date-fns";
-import { useRouter } from "next/navigation";
+import { formatCurrency } from "@/lib/utils";
 
-const formatCurrency = (value: number | null) => {
-  if (value === null || value === undefined) return "$0.00";
-  return `$${value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-interface MemberStats {
-  memberId: string;
-  memberLogin: string;
-  currency: string;
-  totalNGR: number;
-  totalCommission: number;
-  referralCount: number;
-  lastActive: string;
-  tierStats: {
-    [key: number]: {
-      ngr: number;
-      commission: number;
-    };
-  };
+interface CommissionData {
+  START_DATE: string;
+  END_DATE: string;
+  MEMBER_ID: string;
+  MEMBER_LOGIN: string;
+  MEMBER_CURRENCY: string;
+  TOTAL_COMMISSION: number;
+  REFEREE_DEPOSIT: number;
+  REFEREE_TURNOVER: number;
+  REFEREE_WIN_LOSS: number;
 }
 
-const DATE_RANGES = {
-  "3m": "Last 3 Months",
-  "6m": "Last 6 Months",
-  "12m": "Last 12 Months",
-  "all": "All Time"
-};
+interface DetailedCommissionData {
+  RELATIVE_LEVEL: number;
+  RELATIVE_LEVEL_REFEREE_LOGIN: string;
+  TOTAL_COMMISSION: number;
+  TOTAL_DEPOSIT_AMOUNT: number;
+  TOTAL_VALID_TURNOVER: number;
+  TOTAL_WIN_LOSS: number;
+}
 
 export default function MembersList() {
-  const router = useRouter();
+  const [data, setData] = useState<CommissionData[]>([]);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [detailedData, setDetailedData] = useState<DetailedCommissionData[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
-  const [dateRange, setDateRange] = useState("6m");
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof MemberStats;
-    direction: "asc" | "desc";
-  }>({ key: "lastActive", direction: "desc" });
-  const [sortedData, setSortedData] = useState<MemberStats[]>([]);
-
-  const getDateRangeFilter = () => {
-    const endDate = new Date();
-    let startDate: Date;
-
-    switch (dateRange) {
-      case "3m":
-        startDate = subMonths(endDate, 3);
-        break;
-      case "6m":
-        startDate = subMonths(endDate, 6);
-        break;
-      case "12m":
-        startDate = subMonths(endDate, 12);
-        break;
-      default:
-        startDate = new Date(0); // All time
-    }
-
-    return { startDate, endDate };
-  };
-
-  const aggregateData = (
-    commissionData: DailyCommission[], 
-    networkData: ReferralNetwork[]
-  ): MemberStats[] => {
-    const memberMap = new Map<string, MemberStats>();
-
-    // First, process commission data
-    commissionData.forEach(record => {
-      if (!memberMap.has(record.MEMBER_ID)) {
-        memberMap.set(record.MEMBER_ID, {
-          memberId: record.MEMBER_ID,
-          memberLogin: record.MEMBER_LOGIN,
-          currency: record.MEMBER_CURRENCY,
-          totalNGR: 0,
-          totalCommission: 0,
-          referralCount: 0,
-          lastActive: record.SUMMARY_MONTH,
-          tierStats: {},
-        });
-      }
-
-      const stats = memberMap.get(record.MEMBER_ID)!;
-      const tier = record.RELATIVE_LEVEL;
-
-      // Initialize tier stats if not exists
-      if (!stats.tierStats[tier]) {
-        stats.tierStats[tier] = {
-          ngr: 0,
-          commission: 0,
-        };
-      }
-
-      // Update NGR and commission for the tier
-      stats.tierStats[tier].ngr += record.TOTAL_WIN_LOSS || 0;
-      stats.tierStats[tier].commission += record.LOCAL_COMMISSION_AMOUNT || 0;
-
-      // Update totals
-      stats.totalNGR += record.TOTAL_WIN_LOSS || 0;
-      stats.totalCommission += record.LOCAL_COMMISSION_AMOUNT || 0;
-
-      // Update last active if current record is more recent
-      if (record.SUMMARY_MONTH > stats.lastActive) {
-        stats.lastActive = record.SUMMARY_MONTH;
-      }
-    });
-
-    // Then, process network data for referral counts
-    networkData.forEach(record => {
-      const referrerId = record.REFERRER_ID;
-      if (memberMap.has(referrerId)) {
-        memberMap.get(referrerId)!.referralCount++;
-      }
-    });
-
-    return Array.from(memberMap.values());
-  };
 
   const handleSearch = async () => {
-    if (!searchTerm.trim()) {
-      return;
-    }
+    if (!searchTerm.trim()) return;
 
     setLoading(true);
     try {
-      const response = await fetch("/api/mlm-network");
-      const { commission, network } = await response.json();
-      const searchLower = searchTerm.toLowerCase();
+      console.log('Searching for:', searchTerm);
+      
+      const response = await fetch('/api/mlm-network');
+      const result = await response.json();
+      
+      console.log('API response:', result);
+      
+      if (!result.commission) {
+        throw new Error('No commission data received');
+      }
 
-      // Get date range filter
-      const { startDate, endDate } = getDateRangeFilter();
-      const startMonth = startDate.toISOString().slice(0, 7); // YYYY-MM format
-
-      // Filter commission data by date range and search term
-      const filteredCommission = commission.filter((m: DailyCommission) => {
-        const matchesSearch = 
-          m.MEMBER_LOGIN.toLowerCase().includes(searchLower) ||
-          m.MEMBER_ID.toLowerCase().includes(searchLower);
-        
-        return m.SUMMARY_MONTH >= startMonth && matchesSearch;
+      // Simplified filter logic to only search by MEMBER_LOGIN
+      const filteredData = result.commission.filter((item: CommissionData) => {
+        const matchesLogin = item.MEMBER_LOGIN.toLowerCase().includes(searchTerm.toLowerCase());
+        console.log('Checking member:', {
+          memberLogin: item.MEMBER_LOGIN,
+          searchTerm,
+          matches: matchesLogin
+        });
+        return matchesLogin;
       });
-
-      // Filter network data by search term
-      const filteredNetwork = network.filter((m: ReferralNetwork) => 
-        m.REFERRER_LOGIN.toLowerCase().includes(searchLower) ||
-        m.REFEREE_LOGIN.toLowerCase().includes(searchLower)
-      );
-
-      const aggregatedData = aggregateData(filteredCommission, filteredNetwork);
-      setSortedData(aggregatedData);
+      
+      console.log('Filtered data:', filteredData);
+      
+      setData(filteredData);
       setHasSearched(true);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error('Error fetching data:', error);
+      setData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSort = (key: keyof MemberStats) => {
-    const direction = sortConfig.key === key && sortConfig.direction === "asc" ? "desc" : "asc";
-    setSortConfig({ key, direction });
-
-    const sorted = [...sortedData].sort((a, b) => {
-      let aValue = a[key];
-      let bValue = b[key];
-
-      if (typeof aValue === 'object') {
-        // Handle nested objects (like tierStats)
-        aValue = Object.values(aValue as object).reduce((sum: number, val: any) => 
-          sum + (val.commission || 0), 0);
-        bValue = Object.values(bValue as object).reduce((sum: number, val: any) => 
-          sum + (val.commission || 0), 0);
-      }
-
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        return direction === "asc"
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-
-      return direction === "asc"
-        ? (aValue as number) - (bValue as number)
-        : (bValue as number) - (aValue as number);
-    });
-
-    setSortedData(sorted);
+  const formatDateRange = (startDate: string, endDate: string) => {
+    const start = new Date(startDate.split(' ')[0]);
+    const end = new Date(endDate.split(' ')[0]);
+    
+    return `${start.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })} - ${end.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })}`;
   };
 
-  const handleViewDetails = (memberId: string, memberLogin: string) => {
-    const searchParams = new URLSearchParams({
-      member: memberLogin,
-      dateRange: dateRange
-    });
-    router.push(`/finance?${searchParams.toString()}`);
+  const fetchDetailedData = async (memberLogin: string, startDate: string, endDate: string) => {
+    try {
+      console.log('Fetching details for:', { memberLogin, startDate, endDate }); // Debug log
+      
+      const response = await fetch(`/api/mlm-network/details?memberLogin=${memberLogin}&startDate=${startDate}&endDate=${endDate}`);
+      const result = await response.json();
+      
+      console.log('Details API response:', result); // Debug log
+      
+      return result.details;
+    } catch (error) {
+      console.error('Error fetching detailed data:', error);
+      return [];
+    }
+  };
+
+  const handleRowClick = async (row: CommissionData) => {
+    const rowKey = `${row.START_DATE}-${row.MEMBER_ID}`;
+    
+    if (expandedRow === rowKey) {
+      // Clicking an expanded row collapses it
+      setExpandedRow(null);
+      setDetailedData([]);
+      return;
+    }
+
+    // Expand the clicked row
+    setExpandedRow(rowKey);
+    try {
+      const details = await fetchDetailedData(
+        row.MEMBER_LOGIN,
+        row.START_DATE,
+        row.END_DATE
+      );
+      setDetailedData(details || []);
+    } catch (error) {
+      console.error('Error loading details:', error);
+      setDetailedData([]);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by member ID or login..."
-            className="pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 handleSearch();
@@ -242,127 +155,133 @@ export default function MembersList() {
             }}
           />
         </div>
-        <Select
-          value={dateRange}
-          onValueChange={(value) => {
-            setDateRange(value);
-            if (hasSearched) {
-              handleSearch();
-            }
-          }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <Calendar className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Select date range" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(DATE_RANGES).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Button onClick={handleSearch} disabled={!searchTerm.trim()}>
           Search
         </Button>
       </div>
 
       {loading ? (
-        <div className="flex h-[600px] items-center justify-center">
+        <div className="flex h-[400px] items-center justify-center">
           Loading...
         </div>
       ) : hasSearched ? (
-        sortedData.length > 0 ? (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead
-                    className="cursor-pointer"
-                    onClick={() => handleSort("memberLogin")}
+        data.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date Range</TableHead>
+                <TableHead>Member</TableHead>
+                <TableHead>Currency</TableHead>
+                <TableHead className="text-right">Total Commission</TableHead>
+                <TableHead colSpan={3} className="text-center border-l">
+                  Referee's Performance
+                </TableHead>
+              </TableRow>
+              <TableRow>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
+                <TableHead></TableHead>
+                <TableHead className="text-right">Total Deposit</TableHead>
+                <TableHead className="text-right">Valid Turnover</TableHead>
+                <TableHead className="text-right">NGR</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((row) => (
+                <>
+                  <TableRow 
+                    key={`${row.START_DATE}-${row.MEMBER_ID}`}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleRowClick(row)}
                   >
-                    Member
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer"
-                    onClick={() => handleSort("currency")}
-                  >
-                    Currency
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-right"
-                    onClick={() => handleSort("totalNGR")}
-                  >
-                    Total NGR
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-right"
-                    onClick={() => handleSort("totalCommission")}
-                  >
-                    Total Commission
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-right"
-                    onClick={() => handleSort("referralCount")}
-                  >
-                    Referrals
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-right"
-                    onClick={() => handleSort("lastActive")}
-                  >
-                    Last Active
-                  </TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedData.map((member) => (
-                  <TableRow key={member.memberId}>
+                    <TableCell>{formatDateRange(row.START_DATE, row.END_DATE)}</TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{member.memberLogin}</div>
+                        <div className="font-medium">{row.MEMBER_LOGIN}</div>
                         <div className="text-sm text-muted-foreground">
-                          ID: {member.memberId}
+                          ID: {row.MEMBER_ID}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{member.currency}</TableCell>
+                    <TableCell>{row.MEMBER_CURRENCY}</TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(member.totalNGR)}
+                      {formatCurrency(row.TOTAL_COMMISSION, row.MEMBER_CURRENCY)}
+                    </TableCell>
+                    <TableCell className="text-right border-l">
+                      {formatCurrency(row.REFEREE_DEPOSIT, row.MEMBER_CURRENCY)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(member.totalCommission)}
+                      {formatCurrency(row.REFEREE_TURNOVER, row.MEMBER_CURRENCY)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {member.referralCount}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {member.lastActive}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewDetails(member.memberId, member.memberLogin)}
-                      >
-                        View Details
-                      </Button>
+                      {formatCurrency(row.REFEREE_WIN_LOSS, row.MEMBER_CURRENCY)}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                  {expandedRow === `${row.START_DATE}-${row.MEMBER_ID}` && (
+                    <TableRow>
+                      <TableCell colSpan={7}>
+                        <div className="py-4">
+                          <h4 className="font-semibold mb-2">Breakdown by Referee Level</h4>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Level</TableHead>
+                                <TableHead className="text-right">Commission</TableHead>
+                                <TableHead className="text-right">Deposit</TableHead>
+                                <TableHead className="text-right">Turnover</TableHead>
+                                <TableHead className="text-right">NGR</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {Array.isArray(detailedData) && detailedData.length > 0 ? (
+                                detailedData.map((detail) => (
+                                  <TableRow key={detail.RELATIVE_LEVEL}>
+                                    <TableCell>
+                                      {detail.RELATIVE_LEVEL}
+                                      <div className="text-sm text-muted-foreground">
+                                        Referee: {detail.RELATIVE_LEVEL_REFEREE_LOGIN.split(':').join(' ')}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {formatCurrency(detail.TOTAL_COMMISSION, row.MEMBER_CURRENCY)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {formatCurrency(detail.TOTAL_DEPOSIT_AMOUNT, row.MEMBER_CURRENCY)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {formatCurrency(detail.TOTAL_VALID_TURNOVER, row.MEMBER_CURRENCY)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {formatCurrency(detail.TOTAL_WIN_LOSS, row.MEMBER_CURRENCY)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              ) : (
+                                <TableRow>
+                                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                    No detailed data available
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              ))}
+            </TableBody>
+          </Table>
         ) : (
-          <div className="flex h-[600px] items-center justify-center text-muted-foreground">
+          <div className="flex h-[400px] items-center justify-center text-muted-foreground">
             No results found
           </div>
         )
       ) : (
-        <div className="flex h-[600px] items-center justify-center text-muted-foreground">
-          Enter a member ID or login to view member details
+        <div className="flex h-[400px] items-center justify-center text-muted-foreground">
+          Search for a member to view their commission data
         </div>
       )}
     </div>

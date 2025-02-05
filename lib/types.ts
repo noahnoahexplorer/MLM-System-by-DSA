@@ -52,4 +52,14 @@ export interface ReferralNetwork {
   CREATED_DATE: string;
   LEVEL: number;
   HIERARCHY: string;
+}
+
+export interface Member {
+  memberId: string;
+  memberLogin: string;
+  SUMMARY_MONTH: string;
+  currency: string;
+  totalNGR: number;
+  totalCommission: number;
+  referralCount: number;
 } 

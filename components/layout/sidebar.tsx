@@ -8,11 +8,17 @@ import {
   FileText,
   Settings,
   Network,
+  FileSpreadsheet,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const sidebarItems = [
+  {
+    title: "Weekly Commission List",
+    icon: FileSpreadsheet,
+    href: "/weekly-commission",
+  },
   {
     title: "Dashboard",
     icon: BarChart3,
