@@ -1,10 +1,9 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
-import Header from '@/components/layout/header';
-import Sidebar from '@/components/layout/sidebar';
+import { Providers } from './providers';
+import { RootLayoutClient } from '@/components/layout/root-layout-client';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,16 +20,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="min-h-screen">
-            <Header />
-            <div className="flex">
-              <Sidebar />
-              <main className="flex-1 p-6">{children}</main>
-            </div>
-          </div>
+        <Providers>
+          <RootLayoutClient>{children}</RootLayoutClient>
           <Toaster />
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );
