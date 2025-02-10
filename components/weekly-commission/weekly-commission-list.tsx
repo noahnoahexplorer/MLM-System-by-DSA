@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Download, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,19 +61,18 @@ export default function WeeklyCommissionList() {
   const [loading, setLoading] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState(weeklyIntervals[0].value);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async (weekValue: string) => {
     setLoading(true);
     try {
-      const response = await fetch('/api/weekly-commission');
+      const [startDate, endDate] = weekValue.split('_');
+      const response = await fetch(
+        `/api/weekly-commission?startDate=${startDate}&endDate=${endDate}`
+      );
       const result = await response.json();
       
       const commissionData = result.commission || [];
       setAllData(commissionData);
-      filterDataByWeek(commissionData, selectedWeek);
+      setFilteredData(commissionData);
     } catch (error) {
       console.error('Error fetching data:', error);
       setAllData([]);
@@ -81,12 +80,17 @@ export default function WeeklyCommissionList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleWeekChange = (value: string) => {
     setSelectedWeek(value);
-    filterDataByWeek(allData, value);
+    fetchData(value);
   };
+
+  // Initial load
+  useEffect(() => {
+    fetchData(selectedWeek);
+  }, []); // Only run on mount
 
   // Function to aggregate data by memberLogin
   const aggregateData = (data: CommissionData[]) => {
@@ -104,14 +108,6 @@ export default function WeeklyCommissionList() {
     }, new Map<string, CommissionData>());
 
     return Array.from(aggregatedMap.values());
-  };
-
-  const filterDataByWeek = (data: CommissionData[], week: string) => {
-    const [startDate, endDate] = week.split('_');
-    setFilteredData(data.filter(item => {
-      const itemDate = item.START_DATE.split(' ')[0];
-      return itemDate >= startDate && itemDate <= endDate;
-    }));
   };
 
   // Calculate summary with aggregated data
@@ -228,6 +224,7 @@ export default function WeeklyCommissionList() {
         <Select
           value={selectedWeek}
           onValueChange={handleWeekChange}
+          disabled={loading}
         >
           <SelectTrigger className="w-[300px]">
             <Calendar className="mr-2 h-4 w-4" />
@@ -243,7 +240,7 @@ export default function WeeklyCommissionList() {
         </Select>
         <Button 
           onClick={handleExport} 
-          disabled={!filteredData.length}
+          disabled={loading || !filteredData.length}
           variant="outline"
         >
           <Download className="mr-2 h-4 w-4" />

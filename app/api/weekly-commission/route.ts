@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/snowflake';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // Get start and end dates from query parameters
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
     const commissionQuery = `
       SELECT 
         START_DATE,
@@ -11,7 +16,10 @@ export async function GET() {
         MEMBER_LOGIN,
         MEMBER_CURRENCY,
         LOCAL_COMMISSION_AMOUNT as TOTAL_COMMISSION
-      FROM DEV_DSA.PRESENTATION.MLM_DAILY_COMMISSION 
+      FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION 
+      WHERE 1=1
+      ${startDate ? `AND DATE(START_DATE) = '${startDate}'` : ''}
+      ${endDate ? `AND DATE(END_DATE) = '${endDate}'` : ''}
       ORDER BY START_DATE DESC, MEMBER_LOGIN
     `;
     
