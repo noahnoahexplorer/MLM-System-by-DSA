@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/contexts/auth-context';
 import { redirect } from 'next/navigation';
 
 export default function AuthLayout({
@@ -8,9 +8,13 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { status } = useSession();
+  const { user, isLoading } = useAuth();
 
-  if (status === 'authenticated') {
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (user) {
     redirect('/weekly-commission');
   }
 

@@ -59,7 +59,7 @@ export default function WeeklyCommissionList() {
   const [allData, setAllData] = useState<CommissionData[]>([]);
   const [filteredData, setFilteredData] = useState<CommissionData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedWeek, setSelectedWeek] = useState(weeklyIntervals[0].value);
+  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
 
   const fetchData = useCallback(async (weekValue: string) => {
     setLoading(true);
@@ -86,11 +86,6 @@ export default function WeeklyCommissionList() {
     setSelectedWeek(value);
     fetchData(value);
   };
-
-  // Initial load
-  useEffect(() => {
-    fetchData(selectedWeek);
-  }, []); // Only run on mount
 
   // Function to aggregate data by memberLogin
   const aggregateData = (data: CommissionData[]) => {
@@ -222,7 +217,7 @@ export default function WeeklyCommissionList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Select
-          value={selectedWeek}
+          value={selectedWeek || ""}
           onValueChange={handleWeekChange}
           disabled={loading}
         >
@@ -319,6 +314,10 @@ export default function WeeklyCommissionList() {
       {loading ? (
         <div className="flex h-[400px] items-center justify-center">
           Loading...
+        </div>
+      ) : !selectedWeek ? (
+        <div className="flex h-[400px] items-center justify-center text-muted-foreground">
+          Please select a week to view commission data
         </div>
       ) : filteredData.length > 0 ? (
         <Table>

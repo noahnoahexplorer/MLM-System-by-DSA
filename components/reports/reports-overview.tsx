@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -18,680 +17,396 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { subDays } from "date-fns";
-import { MLMNetworkData } from "@/lib/types";
 import { DollarSign, Users, TrendingUp, ArrowUpRight } from "lucide-react";
 import {
-  Bar,
-  BarChart,
-  Line,
   LineChart,
-  ChartContainer,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-} from "@/components/ui/chart";
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  ComposedChart,
+  Area,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  LabelList
+} from "recharts";
 
-// Helper function to format currency
-const formatCurrency = (value: number | null) => {
-  if (value === null || value === undefined) return "$0.00";
-  return `$${value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-interface DailyStats {
-  date: string;
-  revenue: number;
-  newMembers: number;
-  activeMembers: number;
-  commission: number;
-}
-
-interface MemberPerformance {
-  memberId: string;
-  memberLogin: string;
-  level: string;
+interface CommissionReport {
+  month: string;
+  totalCommission: number;
+  uniqueReferees: number;
+  averageCommission: number;
   totalNGR: number;
-  commission: number;
-  activeReferrals: number;
+  refereePerformance: {
+    totalDeposit: number;
+    totalTurnover: number;
+    totalWinLoss: number;
+  };
 }
 
-interface NetworkStats {
-  level: string;
-  members: number;
-}
-
-// Add a custom tick style for better axis appearance
-const CustomAxisTick = (props: any) => {
-  const { x, y, payload } = props;
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text
-        x={0}
-        y={0}
-        dy={16}
-        textAnchor="middle"
-        fill="hsl(var(--muted-foreground))"
-        className="text-xs font-medium"
-      >
-        {payload.value}
-      </text>
-    </g>
-  );
+const CHART_COLORS = {
+  primary: '#8884d8',
+  secondary: '#82ca9d',
+  tertiary: '#ffc658',
+  background: '#ffffff',
+  grid: '#f0f0f0',
+  text: '#64748b', // Slate-500 for text
 };
 
-// Add custom Y axis tick for currency values
-const CurrencyAxisTick = (props: any) => {
-  const { x, y, payload } = props;
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text
-        x={0}
-        y={0}
-        dx={-10}
-        textAnchor="end"
-        fill="hsl(var(--muted-foreground))"
-        className="text-xs font-medium"
-      >
-        {formatCurrency(payload.value)}
-      </text>
-    </g>
-  );
+const CHART_STYLES = {
+  tooltip: {
+    backgroundColor: '#ffffff',
+    border: '1px solid #e2e8f0', // Slate-200
+    borderRadius: '8px',
+    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+    padding: '8px',
+  },
+  fontSize: {
+    small: '12px',
+    normal: '14px',
+  }
 };
 
 export default function ReportsOverview() {
-  const [dateRange, setDateRange] = useState("7d");
-  const [data, setData] = useState<MLMNetworkData[]>([]);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString());
+  const [reportData, setReportData] = useState<CommissionReport | null>(null);
+  const [monthlyTrends, setMonthlyTrends] = useState<CommissionReport[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
-  const [topPerformers, setTopPerformers] = useState<MemberPerformance[]>([]);
-  const [networkStats, setNetworkStats] = useState<NetworkStats[]>([]);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch('/api/mlm-network');
-        const result = await response.json();
-        
-        // Get date range
-        const endDate = new Date();
-        let startDate: Date;
-        
-        switch (dateRange) {
-          case "7d":
-            startDate = subDays(endDate, 7);
-            break;
-          case "30d":
-            startDate = subDays(endDate, 30);
-            break;
-          case "90d":
-            startDate = subDays(endDate, 90);
-            break;
-          default:
-            startDate = new Date(0);
-        }
+    fetchReportData();
+  }, [selectedYear, selectedMonth]);
 
-        // Filter data by date range
-        const filteredData = result.data.filter((m: MLMNetworkData) => {
-          const date = new Date(m.SUMMARIZE_DATE);
-          return date >= startDate && date <= endDate;
-        });
-
-        setData(filteredData);
-
-        // Process daily stats
-        const dailyStatsMap = new Map<string, DailyStats>();
-        const memberPerformanceMap = new Map<string, MemberPerformance>();
-        const networkLevels = new Map<string, number>();
-
-        filteredData.forEach((record: MLMNetworkData) => {
-          // Daily stats processing
-          const date = new Date(record.SUMMARIZE_DATE).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric'
-          });
-
-          const dailyStat = dailyStatsMap.get(date) || {
-            date,
-            revenue: 0,
-            newMembers: 0,
-            activeMembers: 0,
-            commission: 0
-          };
-
-          dailyStat.revenue += (record.TIER1_DAILY_NGR || 0) + 
-                             (record.TIER2_DAILY_NGR || 0) + 
-                             (record.TIER3_DAILY_NGR || 0);
-          dailyStat.commission += (record.TIER1_COMMISSION || 0) + 
-                                (record.TIER2_COMMISSION || 0) + 
-                                (record.TIER3_COMMISSION || 0);
-
-          // Check if member is active
-          if (dailyStat.revenue > 0 || dailyStat.commission > 0) {
-            dailyStat.activeMembers++;
-          }
-
-          // Check if this is a new member
-          const createdDate = new Date(record.CREATED_DATE);
-          if (
-            createdDate.toDateString() === new Date(record.SUMMARIZE_DATE).toDateString()
-          ) {
-            dailyStat.newMembers++;
-          }
-
-          dailyStatsMap.set(date, dailyStat);
-
-          // Member performance processing
-          const memberPerf = memberPerformanceMap.get(record.MEMBER_ID) || {
-            memberId: record.MEMBER_ID,
-            memberLogin: record.MEMBER_LOGIN,
-            level: record.MEMBERSHIP_LEVEL,
-            totalNGR: 0,
-            commission: 0,
-            activeReferrals: 0
-          };
-
-          memberPerf.totalNGR += (record.TIER1_DAILY_NGR || 0) + 
-                                (record.TIER2_DAILY_NGR || 0) + 
-                                (record.TIER3_DAILY_NGR || 0);
-          memberPerf.commission += (record.TIER1_COMMISSION || 0) + 
-                                 (record.TIER2_COMMISSION || 0) + 
-                                 (record.TIER3_COMMISSION || 0);
-
-          if (record.DESCENDANTS_LOGIN && record.DESCENDANTS_LOGIN !== '[]') {
-            const referrals = new Set(
-              record.DESCENDANTS_LOGIN
-                .replace('[', '')
-                .replace(']', '')
-                .split(',')
-                .map(path => path.split(':')[1])
-                .filter(Boolean)
-            );
-            memberPerf.activeReferrals = referrals.size;
-          }
-
-          memberPerformanceMap.set(record.MEMBER_ID, memberPerf);
-
-          // Network level processing
-          if (record.DESCENDANTS_LOGIN && record.DESCENDANTS_LOGIN !== '[]') {
-            record.DESCENDANTS_LOGIN
-              .replace('[', '')
-              .replace(']', '')
-              .split(',')
-              .forEach(path => {
-                const level = path.split(':').length - 1;
-                networkLevels.set(
-                  `Level ${level}`, 
-                  (networkLevels.get(`Level ${level}`) || 0) + 1
-                );
-              });
-          }
-        });
-
-        // Sort and set the processed data
-        setDailyStats(Array.from(dailyStatsMap.values())
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-
-        setTopPerformers(Array.from(memberPerformanceMap.values())
-          .sort((a, b) => b.totalNGR - a.totalNGR)
-          .slice(0, 10));
-
-        setNetworkStats(Array.from(networkLevels.entries())
-          .map(([level, members]) => ({ level, members }))
-          .sort((a, b) => parseInt(a.level.split(' ')[1]) - parseInt(b.level.split(' ')[1])));
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setLoading(false);
-      }
+  const fetchReportData = async () => {
+    try {
+      const response = await fetch(
+        `/api/reports/commission?year=${selectedYear}&month=${selectedMonth}`
+      );
+      const data = await response.json();
+      setReportData(data.report);
+      setMonthlyTrends(data.trends);
+    } catch (error) {
+      console.error("Error fetching report data:", error);
+    } finally {
+      setLoading(false);
     }
-
-    fetchData();
-  }, [dateRange]);
-
-  const totalRevenue = dailyStats.reduce((sum, day) => sum + day.revenue, 0);
-  const totalCommission = dailyStats.reduce((sum, day) => sum + day.commission, 0);
-  const totalNewMembers = dailyStats.reduce((sum, day) => sum + day.newMembers, 0);
-  const averageActiveMembers = Math.round(
-    dailyStats.reduce((sum, day) => sum + day.activeMembers, 0) / (dailyStats.length || 1)
-  );
-
-  // Format data for shadcn charts
-  const revenueChartData = dailyStats.map(stat => ({
-    name: stat.date,
-    revenue: stat.revenue,
-    commission: stat.commission,
-  }));
-
-  const memberActivityData = dailyStats.map(stat => ({
-    name: stat.date,
-    "Active Members": stat.activeMembers,
-    "New Members": stat.newMembers,
-  }));
-
-  const networkStatsData = networkStats.map(stat => ({
-    name: stat.level,
-    total: stat.members,
-  }));
-
-  // Update the chart configurations
-  const chartConfig = {
-    revenue: {
-      color: "hsl(var(--primary))",
-      label: "Revenue",
-    },
-    commission: {
-      color: "hsl(var(--success))",
-      label: "Commission",
-    },
-    "Active Members": {
-      color: "hsl(var(--primary))",
-      label: "Active Members",
-    },
-    "New Members": {
-      color: "hsl(var(--success))",
-      label: "New Members",
-    },
-    total: {
-      color: "hsl(var(--primary))",
-      label: "Total",
-    },
   };
 
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(value);
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <Tabs defaultValue="financial" className="space-y-4">
-      <div className="flex items-center justify-between">
-        <TabsList>
-          <TabsTrigger value="financial">Financial Reports</TabsTrigger>
-          <TabsTrigger value="members">Member Activity</TabsTrigger>
-          <TabsTrigger value="network">Network Analysis</TabsTrigger>
-        </TabsList>
-        <Select
-          value={dateRange}
-          onValueChange={setDateRange}
-        >
+    <div className="space-y-6">
+      {/* Date Filter Controls */}
+      <div className="flex gap-4">
+        <Select value={selectedYear} onValueChange={setSelectedYear}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select date range" />
+            <SelectValue placeholder="Select Year" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="7d">Last 7 Days</SelectItem>
-            <SelectItem value="30d">Last 30 Days</SelectItem>
-            <SelectItem value="90d">Last 90 Days</SelectItem>
-            <SelectItem value="all">All Time</SelectItem>
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+              <SelectItem key={year} value={year.toString()}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select Month" />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+              <SelectItem key={month} value={month.toString()}>
+                {new Date(2000, month - 1).toLocaleString('default', { month: 'long' })}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Financial Reports Tab */}
-      <TabsContent value="financial" className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {loading ? "Loading..." : formatCurrency(totalRevenue)}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Commission
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {loading ? "Loading..." : formatCurrency(totalCommission)}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                New Members
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {loading ? "Loading..." : totalNewMembers}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Avg. Active Members
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {loading ? "Loading..." : averageActiveMembers}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Revenue Trends</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer className="h-[300px]" config={chartConfig}>
-                <LineChart data={revenueChartData} margin={{ top: 20, right: 30, left: 60, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={CustomAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
-                  />
-                  <YAxis 
-                    tick={CurrencyAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px',
-                    }}
-                    labelStyle={{ color: 'hsl(var(--foreground))' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    strokeWidth={2}
-                    activeDot={{ r: 6, strokeWidth: 2 }}
-                    dot={{ r: 4 }}
-                    name="Revenue"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="commission"
-                    strokeWidth={2}
-                    activeDot={{ r: 6, strokeWidth: 2 }}
-                    dot={{ r: 4 }}
-                    name="Commission"
-                  />
-                </LineChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Member Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer className="h-[300px]" config={chartConfig}>
-                <BarChart data={memberActivityData} margin={{ top: 20, right: 30, left: 40, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={CustomAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
-                  />
-                  <YAxis 
-                    tick={CustomAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px',
-                    }}
-                    labelStyle={{ color: 'hsl(var(--foreground))' }}
-                  />
-                  <Bar
-                    dataKey="Active Members"
-                    radius={[6, 6, 0, 0]}
-                    name="Active Members"
-                  />
-                  <Bar
-                    dataKey="New Members"
-                    radius={[6, 6, 0, 0]}
-                    name="New Members"
-                  />
-                </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        </div>
-
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Top Performing Members</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Commission</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Member</TableHead>
-                  <TableHead>Level</TableHead>
-                  <TableHead className="text-right">Total NGR</TableHead>
-                  <TableHead className="text-right">Commission Earned</TableHead>
-                  <TableHead className="text-right">Active Referrals</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {topPerformers.map((member) => (
-                  <TableRow key={member.memberId}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{member.memberLogin}</div>
-                        <div className="text-sm text-muted-foreground">
-                          ID: {member.memberId}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{member.level}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(member.totalNGR)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(member.commission)}</TableCell>
-                    <TableCell className="text-right">{member.activeReferrals}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="text-2xl font-bold">
+              {formatCurrency(reportData?.totalCommission || 0)}
+            </div>
           </CardContent>
         </Card>
-      </TabsContent>
 
-      {/* Member Activity Tab */}
-      <TabsContent value="members" className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Member Registration Trend</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer className="h-[300px]" config={chartConfig}>
-                <LineChart 
-                  data={dailyStats.map(stat => ({
-                    name: stat.date,
-                    total: stat.newMembers,
-                  }))}
-                  margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unique Referees</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{reportData?.uniqueReferees || 0}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Commission</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(reportData?.averageCommission || 0)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total NGR</CardTitle>
+            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(reportData?.totalNGR || 0)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Commission Trends Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Commission & Referee Trends</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px] w-full">
+            <ResponsiveContainer>
+              <ComposedChart data={monthlyTrends}>
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke={CHART_COLORS.grid} 
+                  vertical={false}
+                />
+                <XAxis 
+                  dataKey="month" 
+                  tick={{ fill: CHART_COLORS.text, fontSize: CHART_STYLES.fontSize.small }}
+                  tickFormatter={(value) => new Date(value).toLocaleDateString('default', { month: 'short' })}
+                  axisLine={{ stroke: CHART_COLORS.grid }}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  tick={{ fill: CHART_COLORS.text, fontSize: CHART_STYLES.fontSize.small }}
+                  tickFormatter={(value) => formatCurrency(value)}
+                  axisLine={{ stroke: CHART_COLORS.grid }}
+                />
+                <YAxis 
+                  yAxisId="right" 
+                  orientation="right"
+                  tick={{ fill: CHART_COLORS.text, fontSize: CHART_STYLES.fontSize.small }}
+                  axisLine={{ stroke: CHART_COLORS.grid }}
+                />
+                <Tooltip 
+                  contentStyle={CHART_STYLES.tooltip}
+                  labelStyle={{ color: CHART_COLORS.text, fontWeight: 600 }}
+                  formatter={(value, name) => [
+                    name === "Commission" ? formatCurrency(Number(value)) : `${value} referees`,
+                    name
+                  ]}
+                />
+                <Legend 
+                  wrapperStyle={{ fontSize: CHART_STYLES.fontSize.normal }}
+                />
+                <Area
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="totalCommission"
+                  name="Commission"
+                  fill={CHART_COLORS.primary}
+                  stroke={CHART_COLORS.primary}
+                  fillOpacity={0.3}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="uniqueReferees"
+                  name="Active Referees"
+                  stroke={CHART_COLORS.secondary}
+                  strokeWidth={2}
+                  dot={{ r: 4, fill: CHART_COLORS.secondary }}
+                  activeDot={{ r: 6, strokeWidth: 0 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Performance Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Referee Performance Distribution</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={[reportData?.refereePerformance].filter(Boolean)}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={CustomAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
-                  />
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} />
                   <YAxis 
-                    tick={CustomAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
+                    type="category" 
+                    dataKey="name"
+                    tick={{ fontSize: 12 }}
                   />
                   <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px',
-                    }}
-                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    formatter={(value) => formatCurrency(Number(value))}
+                    contentStyle={{ backgroundColor: '#fff', borderRadius: '8px' }}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="total"
-                    strokeWidth={2}
-                    activeDot={{ r: 6, strokeWidth: 2 }}
-                    dot={{ r: 4 }}
-                    name="New Members"
+                  <Legend />
+                  <Bar 
+                    dataKey="totalDeposit" 
+                    name="Deposits" 
+                    fill="#0088FE"
+                    radius={[0, 4, 4, 0]}
                   />
-                </LineChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Members Trend</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer className="h-[300px]" config={chartConfig}>
-                <LineChart 
-                  data={dailyStats.map(stat => ({
-                    name: stat.date,
-                    total: stat.activeMembers,
-                  }))}
-                  margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={CustomAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
+                  <Bar 
+                    dataKey="totalTurnover" 
+                    name="Turnover" 
+                    fill="#00C49F"
+                    radius={[0, 4, 4, 0]}
                   />
-                  <YAxis 
-                    tick={CustomAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px',
-                    }}
-                    labelStyle={{ color: 'hsl(var(--foreground))' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="total"
-                    strokeWidth={2}
-                    activeDot={{ r: 6, strokeWidth: 2 }}
-                    dot={{ r: 4 }}
-                    name="Active Members"
-                  />
-                </LineChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-
-      {/* Network Analysis Tab */}
-      <TabsContent value="network" className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Network Depth Analysis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer className="h-[300px]" config={chartConfig}>
-                <BarChart data={networkStatsData} margin={{ top: 20, right: 30, left: 40, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={CustomAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
-                  />
-                  <YAxis 
-                    tick={CustomAxisTick}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={{ stroke: 'hsl(var(--border))' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px',
-                    }}
-                    labelStyle={{ color: 'hsl(var(--foreground))' }}
-                  />
-                  <Bar
-                    dataKey="total"
-                    radius={[6, 6, 0, 0]}
-                    name="Members"
+                  <Bar 
+                    dataKey="totalWinLoss" 
+                    name="Win/Loss" 
+                    fill="#FFBB28"
+                    radius={[0, 4, 4, 0]}
                   />
                 </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Recruiters</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Level</TableHead>
-                    <TableHead className="text-right">Direct Referrals</TableHead>
-                    <TableHead className="text-right">Total NGR</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {topPerformers
-                    .sort((a, b) => b.activeReferrals - a.activeReferrals)
-                    .slice(0, 5)
-                    .map((member) => (
-                      <TableRow key={member.memberId}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{member.memberLogin}</div>
-                            <div className="text-sm text-muted-foreground">
-                              ID: {member.memberId}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{member.level}</TableCell>
-                        <TableCell className="text-right">{member.activeReferrals}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(member.totalNGR)}</TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-    </Tabs>
+        {/* Commission Distribution Bar Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Commission Distribution by Level</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer>
+                <BarChart
+                  data={[
+                    {
+                      name: 'Level 1',
+                      commission: reportData?.level1Commission || 0,
+                      referees: reportData?.level1Referees || 0
+                    },
+                    {
+                      name: 'Level 2',
+                      commission: reportData?.level2Commission || 0,
+                      referees: reportData?.level2Referees || 0
+                    },
+                    {
+                      name: 'Level 3',
+                      commission: reportData?.level3Commission || 0,
+                      referees: reportData?.level3Referees || 0
+                    }
+                  ]}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    stroke={CHART_COLORS.grid}
+                    vertical={false}
+                  />
+                  <XAxis 
+                    dataKey="name"
+                    tick={{ fill: CHART_COLORS.text, fontSize: CHART_STYLES.fontSize.small }}
+                    axisLine={{ stroke: CHART_COLORS.grid }}
+                  />
+                  <YAxis 
+                    yAxisId="left"
+                    orientation="left"
+                    tickFormatter={(value) => formatCurrency(value)}
+                    tick={{ fill: CHART_COLORS.text, fontSize: CHART_STYLES.fontSize.small }}
+                    axisLine={{ stroke: CHART_COLORS.grid }}
+                  />
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    tickFormatter={(value) => `${Math.round(value)} refs`}
+                    tick={{ fill: CHART_COLORS.text, fontSize: CHART_STYLES.fontSize.small }}
+                    axisLine={{ stroke: CHART_COLORS.grid }}
+                  />
+                  <Tooltip 
+                    contentStyle={CHART_STYLES.tooltip}
+                    labelStyle={{ color: CHART_COLORS.text, fontWeight: 600 }}
+                    formatter={(value, name) => {
+                      if (name === "Commission") {
+                        return [formatCurrency(Number(value)), name];
+                      }
+                      return [`${Math.round(Number(value))} referees`, "Referees"];
+                    }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ fontSize: CHART_STYLES.fontSize.normal }}
+                  />
+                  <Bar 
+                    yAxisId="left"
+                    dataKey="commission" 
+                    fill={CHART_COLORS.primary}
+                    name="Commission"
+                    radius={[4, 4, 0, 0]}
+                  >
+                    <LabelList 
+                      dataKey="commission" 
+                      position="top" 
+                      formatter={(value) => formatCurrency(Number(value))}
+                      style={{ fontSize: CHART_STYLES.fontSize.small, fill: CHART_COLORS.text }}
+                    />
+                  </Bar>
+                  <Bar 
+                    yAxisId="right"
+                    dataKey="referees" 
+                    fill={CHART_COLORS.secondary}
+                    name="Referees"
+                    radius={[4, 4, 0, 0]}
+                  >
+                    <LabelList 
+                      dataKey="referees" 
+                      position="top"
+                      formatter={(value) => `${Math.round(Number(value))}`}
+                      style={{ fontSize: CHART_STYLES.fontSize.small, fill: CHART_COLORS.text }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
-} 
+}

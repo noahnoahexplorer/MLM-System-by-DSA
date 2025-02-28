@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Moon, Sun, Bell, LogOut } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
-import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
@@ -14,17 +13,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function Header() {
   const { setTheme, theme } = useTheme();
   const [logoError, setLogoError] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { signOut } = useAuth();
 
   const handleSignOut = async () => {
     try {
-      await signOut({ redirect: false });
-      router.push('/login');
+      await signOut();
       toast({
         title: "Signed out",
         description: "You have been successfully signed out",

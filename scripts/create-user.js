@@ -1,55 +1,55 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
-const readline = require('readline');
+// IMPORTANT: Only use this script for development
+// Run with: node scripts/create-user.js
 
-const prisma = new PrismaClient();
+const { createClient } = require('@supabase/supabase-js');
 
-// Create interface for command line input
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
+const supabaseUrl = "https://kkaefpvlkmlyzzhymnrw.supabase.co";
+const supabaseServiceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrYWVmcHZsa21seXp6aHltbnJ3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY0MTg5MCwiZXhwIjoyMDU2MjE3ODkwfQ.ypIWxmxqOjOMwY8mZtFVq_3ktk9SEGGa7Vzb9gu6Mq0"; // Get this from Supabase dashboard > Settings > API
+
+// WARNING: Never commit your service role key to git
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
 });
 
-// Promisify the question method
-const question = (query) => new Promise((resolve) => rl.question(query, resolve));
-
-async function main() {
+async function createUser() {
+  const email = "noahgoh1022@gmail.com";
+  const password = "asdf1234";
+  
   try {
-    // Get user input
-    const username = await question('Enter username: ');
-    const email = await question('Enter email: ');
-    const password = await question('Enter password: ');
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: {
-        username,
-        password: hashedPassword,
-      },
-      create: {
-        email,
-        username,
-        password: hashedPassword,
-      },
+    // Create a new user
+    const { data, error } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true // Skip email confirmation
     });
-
-    console.log('User created successfully:', {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      createdAt: user.createdAt,
-    });
-
+    
+    if (error) {
+      console.error("Error creating user:", error);
+    } else {
+      console.log("User created successfully:", data.user);
+      
+      // Create a profile for the user
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: data.user.id,
+          username: email.split('@')[0],
+          role: 'admin', // Set the role as needed
+          created_at: new Date().toISOString()
+        });
+      
+      if (profileError) {
+        console.error("Error creating profile:", profileError);
+      } else {
+        console.log("Profile created successfully for user:", data.user.id);
+      }
+    }
   } catch (error) {
-    console.error('Error creating user:', error);
-  } finally {
-    await prisma.$disconnect();
-    rl.close();
+    console.error("Exception:", error);
   }
 }
 
-main(); 
+createUser(); 

@@ -1,15 +1,20 @@
 import snowflake from 'snowflake-sdk';
 
 const snowflakeConfig = {
-  account: 'sm23176.ap-northeast-1.aws',
-  username: 'noah',
-  password: 'Ronghui2809.',
-  database: 'DEV_DSA',
-  warehouse: 'DSA_OPERATION',
+  account: process.env.SNOWFLAKE_ACCOUNT,
+  username: process.env.SNOWFLAKE_USERNAME,
+  password: process.env.SNOWFLAKE_PASSWORD,
+  database: process.env.SNOWFLAKE_DATABASE,
+  warehouse: process.env.SNOWFLAKE_WAREHOUSE,
 };
 
 export async function executeQuery(query: string): Promise<any[]> {
   return new Promise((resolve, reject) => {
+    if (!snowflakeConfig.account || !snowflakeConfig.username || !snowflakeConfig.password) {
+      reject(new Error('Missing Snowflake configuration'));
+      return;
+    }
+
     const connection = snowflake.createConnection(snowflakeConfig);
 
     connection.connect((err) => {
