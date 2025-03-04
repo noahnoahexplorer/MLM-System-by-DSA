@@ -89,7 +89,10 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Error fetching compliance data:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch compliance data', details: error.message },
+      { 
+        error: 'Failed to fetch compliance data', 
+        details: error instanceof Error ? error.message : String(error) 
+      },
       { status: 500 }
     );
   }
