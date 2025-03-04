@@ -6,9 +6,11 @@ const snowflakeConfig = {
   password: process.env.SNOWFLAKE_PASSWORD,
   database: process.env.SNOWFLAKE_DATABASE,
   warehouse: process.env.SNOWFLAKE_WAREHOUSE,
+  clientSessionKeepAlive: false,
+  keepAlive: false
 };
 
-export async function executeQuery(query: string): Promise<any[]> {
+export async function executeQuery(query: string, params: any[] = []): Promise<any[]> {
   return new Promise((resolve, reject) => {
     if (!snowflakeConfig.account || !snowflakeConfig.username || !snowflakeConfig.password) {
       reject(new Error('Missing Snowflake configuration'));
@@ -26,6 +28,7 @@ export async function executeQuery(query: string): Promise<any[]> {
 
       connection.execute({
         sqlText: query,
+        binds: params,
         complete: (err, stmt, rows) => {
           if (err) {
             console.error('Failed to execute query:', err);
