@@ -4,10 +4,11 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { ReactNode, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { UserRole } from '@/types/auth';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  allowedRoles: string[];
+  allowedRoles: UserRole[];
   redirectTo?: string;
 }
 
