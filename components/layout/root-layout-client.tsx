@@ -12,36 +12,60 @@ export function RootLayoutClient({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   
   // Auth-related paths that shouldn't show the sidebar
-  const authPaths = ['/login', '/signup', '/forgot-password', '/reset-password'];
+  const authPaths = ['/login', '/signup', '/register', '/forgot-password', '/reset-password', '/unauthorized', '/debug'];
   const isAuthPath = authPaths.some(path => pathname?.startsWith(path));
 
+  // Set mounted state
   useEffect(() => {
     setMounted(true);
-    
-    // Only redirect if we're on the home page and the user is logged in
+  }, []);
+
+  // Handle redirects
+  useEffect(() => {
+    if (!mounted) return;
+
+    // Redirect authenticated users from home to appropriate dashboard based on role
     if (user && pathname === '/') {
-      router.push('/weekly-commission');
+      if (user.role.toUpperCase() === 'MARKETING OPS') {
+        router.push('/marketing-ops-finalized-commission');
+      } else if (user.role.toUpperCase() === 'COMPLIANCE') {
+        router.push('/compliance-checklist');
+      } else if (user.role.toUpperCase() === 'ADMIN') {
+        router.push('/compliance-checklist');
+      } else {
+        // Default for MARKETING role and any other roles
+        router.push('/reports');
+      }
     }
     
-    // Force timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      if (isLoading) {
-        console.log('Forcing loading state to complete after timeout');
-        setMounted(true);
+    // Redirect authenticated users from auth pages to appropriate dashboard
+    if (user && isAuthPath) {
+      if (user.role.toUpperCase() === 'MARKETING OPS') {
+        router.push('/marketing-ops-finalized-commission');
+      } else if (user.role.toUpperCase() === 'COMPLIANCE') {
+        router.push('/compliance-checklist');
+      } else if (user.role.toUpperCase() === 'ADMIN') {
+        router.push('/compliance-checklist');
+      } else {
+        // Default for MARKETING role and any other roles
+        router.push('/reports');
       }
-    }, 3000);
+    }
     
-    return () => clearTimeout(timeout);
-  }, [user, pathname, router, isLoading]);
+    // Redirect unauthenticated users from protected pages to login
+    if (!user && !authLoading && !isAuthPath && pathname !== '/') {
+      router.push('/login');
+    }
+  }, [user, pathname, router, mounted, authLoading, isAuthPath]);
 
-  // Show loading state while auth is being determined, but only briefly
-  if (!mounted && isLoading) {
+  // Show loading state only during initial load
+  if (!mounted || (authLoading && !isAuthPath)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -49,8 +73,8 @@ export function RootLayoutClient({
     );
   }
 
-  // Show layout with sidebar for authenticated users on non-auth pages
-  if (user && !isAuthPath) {
+  // Show layout with sidebar for authenticated users on non-auth paths
+  if (!isAuthPath && user) {
     return (
       <div className="min-h-screen">
         <Header />
@@ -62,6 +86,6 @@ export function RootLayoutClient({
     );
   }
 
-  // For auth pages or unauthenticated users, just show the content
+  // For auth paths or unauthenticated users, just show the content
   return <div className="min-h-screen">{children}</div>;
 } 

@@ -67,7 +67,7 @@ export async function GET(request: Request) {
           MEMBER_CURRENCY,
           SUM(LOCAL_COMMISSION_AMOUNT) as TOTAL_COMMISSION,
           CURRENT_TIMESTAMP() as GENERATION_DATE
-        FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION_DETAILS
+        FROM PROD_ALPHATEL.PRESENTATION.MLM_DAILY_COMMISSION
         WHERE DATE(START_DATE) = '${startDate}'
         AND DATE(END_DATE) = '${endDate}'
         ${exclusionCondition}

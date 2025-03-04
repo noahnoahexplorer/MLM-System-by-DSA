@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,19 +22,25 @@ export default function UserRoleManager() {
   const { toast } = useToast();
   
   // Check if current user is admin
-  const isAdmin = hasPermission(['admin']);
+  const isAdmin = hasPermission(['ADMIN']);
   
   useEffect(() => {
     if (!isAdmin) return;
     
     const fetchUsers = async () => {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, username, role');
-          
-        if (error) throw error;
-        setUsers(data || []);
+        const response = await fetch('/api/users');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch users');
+        }
+        
+        const data = await response.json();
+        setUsers(data.users.map((user: any) => ({
+          id: user.MEMBER_ID,
+          username: user.MEMBER_LOGIN,
+          role: user.ROLE
+        })));
       } catch (error) {
         console.error('Error fetching users:', error);
         toast({
@@ -53,12 +58,17 @@ export default function UserRoleManager() {
   
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
-        
-      if (error) throw error;
+      const response = await fetch('/api/users/update-role', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update user role');
+      }
       
       // Update local state
       setUsers(users.map(user => 
@@ -126,9 +136,9 @@ export default function UserRoleManager() {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="user">User</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="MEMBER">Member</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
+                        <SelectItem value="MANAGER">Manager</SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>

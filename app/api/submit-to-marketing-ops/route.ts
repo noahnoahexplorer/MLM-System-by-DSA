@@ -73,7 +73,7 @@ export async function POST(request: Request) {
         CURRENT_TIMESTAMP() as GENERATION_DATE,
         '${submittedBy}' as SUBMITTED_BY,
         TRUE as VERIFIED_BY_COMPLIANCE
-      FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION_DETAILS
+      FROM PROD_ALPHATEL.PRESENTATION.MLM_DAILY_COMMISSION
       WHERE DATE(START_DATE) = '${startDate}'
       AND DATE(END_DATE) = '${endDate}'
       ${exclusionCondition}

@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import NetworkGraph from "@/components/network/network-graph";
 
 export const metadata: Metadata = {
-  title: "Network | BK8 MLM System",
+  title: "Network | Profit Buddies",
   description: "MLM Network Visualization",
 };
 

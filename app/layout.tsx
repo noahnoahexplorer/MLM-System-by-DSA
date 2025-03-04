@@ -17,6 +17,9 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Add console log for debugging
+  console.log('Root layout - rendering');
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>

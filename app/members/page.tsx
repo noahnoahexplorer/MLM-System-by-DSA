@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import MembersList from "@/components/members/members-list";
 
 export const metadata: Metadata = {
-  title: "Members | BK8 MLM System",
+  title: "Members | Profit Buddies",
   description: "Member Management and Performance Overview",
 };
 

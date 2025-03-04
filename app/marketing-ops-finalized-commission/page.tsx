@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import FinalizedCommissionList from "@/components/finalized-commission/finalized-commission-list";
 
 export const metadata: Metadata = {
-  title: "Marketing Ops - Finalized MLM Comm List | BK8 MLM System",
+  title: "Marketing Ops - Finalized MLM Comm List | Profit Buddies",
   description: "Finalized commission list after compliance review",
 };
 
