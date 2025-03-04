@@ -37,22 +37,24 @@ export async function GET() {
     }
     
     // Create a map of referee to referrer
-    const referrerMap = {};
+    const referrerMap: Record<string, string> = {};
     referrers.forEach(r => {
-      referrerMap[r.REFEREE_LOGIN] = r.REFERRER_LOGIN;
+      if (r.REFEREE_LOGIN) {
+        referrerMap[r.REFEREE_LOGIN] = r.REFERRER_LOGIN;
+      }
     });
     
     // Combine the data
     const combinedExclusions = exclusions.map(exclusion => ({
       ...exclusion,
-      REFERRER_LOGIN: referrerMap[exclusion.REFEREE_LOGIN] || null
+      REFERRER_LOGIN: exclusion.REFEREE_LOGIN && referrerMap[exclusion.REFEREE_LOGIN] || null
     }));
     
     return NextResponse.json({ exclusions: combinedExclusions });
   } catch (error) {
     console.error('Error fetching exclusion list:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch exclusion list' },
+      { error: 'Failed to fetch exclusion list', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
@@ -132,7 +134,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error adding exclusion:', error);
     return NextResponse.json(
-      { error: 'Failed to add exclusion' },
+      { error: 'Failed to add exclusion', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
