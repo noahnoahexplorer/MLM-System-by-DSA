@@ -13,69 +13,34 @@ interface RoleGuardProps {
   showLoader?: boolean;
 }
 
-export function RoleGuard({ 
-  children, 
-  allowedRoles, 
+export function RoleGuard({
+  children,
+  allowedRoles,
   fallbackPath = '/unauthorized',
   showLoader = true
 }: RoleGuardProps) {
-  const { profile, isLoading, user, checkSessionValidity } = useAuth();
+  const { isLoading, user, hasPermission } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    // Only run this effect if we're not in a loading state
-    if (!isLoading) {
-      const validateAccess = async () => {
-        // First check if we have a user
-        if (!user) {
-          console.log("No user found, redirecting to login");
-          router.replace('/login');
-          return;
-        }
-        
-        // Then check if session is valid
-        const isSessionValid = await checkSessionValidity();
-        
-        if (!isSessionValid) {
-          console.log("Invalid session, redirecting to login");
-          router.replace('/login');
-          return;
-        }
-        
-        // Finally check role permissions
-        if (profile && !allowedRoles.includes(profile.role as UserRole)) {
-          console.log(`User role ${profile.role} not in allowed roles, redirecting to ${fallbackPath}`);
-          router.replace(fallbackPath);
-        }
-      };
-      
-      validateAccess();
+    if (!isLoading && !user) {
+      router.push('/login');
+    } else if (!isLoading && user && !hasPermission(allowedRoles)) {
+      router.push(fallbackPath);
     }
-  }, [profile, isLoading, user, allowedRoles, fallbackPath, router, checkSessionValidity]);
+  }, [isLoading, user, hasPermission, allowedRoles, fallbackPath, router]);
 
-  // Show loading state
-  if (isLoading && showLoader) {
-    return (
+  if (isLoading) {
+    return showLoader ? (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
-    );
+    ) : null;
   }
 
-  // Only render children if user has permission
-  if (!isLoading && user && profile && allowedRoles.includes(profile.role as UserRole)) {
-    return <>{children}</>;
+  if (!user || !hasPermission(allowedRoles)) {
+    return null;
   }
 
-  // Show a minimal loader while redirecting
-  if (showLoader) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
-  // Render nothing while redirecting if showLoader is false
-  return null;
+  return <>{children}</>;
 } 
