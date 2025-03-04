@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { UserRole } from '@/types/auth';
 
 export default function Sidebar() {
   const { user, hasPermission } = useAuth();
@@ -36,43 +37,43 @@ export default function Sidebar() {
       title: 'Weekly Commission',
       href: '/weekly-commission',
       icon: FileSpreadsheet,
-      roles: ['ADMIN'] // All roles can access
+      roles: ['ADMIN'] as UserRole[]
     },
     {
       title: 'Compliance Checklist',
       href: '/compliance-checklist',
       icon: ClipboardCheck,
-      roles: ['COMPLIANCE', 'ADMIN'] // Only compliance and admin can access
+      roles: ['COMPLIANCE', 'ADMIN'] as UserRole[]
     },
     {
       title: 'Exclusion List',
       href: '/exclusion-list',
       icon: XCircle,
-      roles: ['COMPLIANCE', 'ADMIN'] // Only compliance and admin can access
+      roles: ['COMPLIANCE', 'ADMIN'] as UserRole[]
     },
     {
       title: 'Marketing Ops Finalized Commission',
       href: '/marketing-ops-finalized-commission',
       icon: CheckSquare,
-      roles: ['MARKETING', 'MARKETING OPS', 'ADMIN'] // All roles can access
+      roles: ['MARKETING', 'MARKETING OPS', 'ADMIN'] as UserRole[]
     },
     {
       title: 'Members',
       href: '/members',
       icon: Users,
-      roles: ['MARKETING', 'MARKETING OPS', 'COMPLIANCE', 'ADMIN'] // All roles can access
+      roles: ['MARKETING', 'MARKETING OPS', 'COMPLIANCE', 'ADMIN'] as UserRole[]
     },
     {
       title: 'Reports',
       href: '/reports',
       icon: BarChart3,
-      roles: ['MARKETING', 'MARKETING OPS', 'COMPLIANCE', 'ADMIN'] // All roles can access
+      roles: ['MARKETING', 'MARKETING OPS', 'COMPLIANCE', 'ADMIN'] as UserRole[]
     },
     {
       title: 'Settings',
       href: '/settings',
       icon: Settings,
-      roles: ['ADMIN'] // Only admin can access
+      roles: ['ADMIN'] as UserRole[]
     },
     // Add other menu items with their required roles
   ];
