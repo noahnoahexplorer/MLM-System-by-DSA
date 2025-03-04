@@ -242,13 +242,17 @@ export default function ExclusionListManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2 w-full max-w-sm">
-          <Input
-            placeholder="Search by referee or excluded by..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full"
-            prefix={<Search className="h-4 w-4 text-muted-foreground" />}
-          />
+          <div className="relative w-full">
+            <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
+              <Search className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <Input
+              placeholder="Search by referee or excluded by..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="w-full pl-8"
+            />
+          </div>
         </div>
         
         <div className="flex items-center space-x-6">
