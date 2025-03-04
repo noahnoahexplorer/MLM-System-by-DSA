@@ -1,8 +1,9 @@
 'use client';
 
 import { useAuth } from '@/contexts/auth-context';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ReactNode, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -16,17 +17,26 @@ export function ProtectedRoute({
   redirectTo = '/login' 
 }: ProtectedRouteProps) {
   const { hasPermission, isLoading, user } = useAuth();
+  const router = useRouter();
   
   useEffect(() => {
     // If not loading and either no user or user doesn't have permission
-    if (!isLoading && (!user || !hasPermission(allowedRoles))) {
-      redirect(redirectTo);
+    if (!isLoading) {
+      if (!user) {
+        router.replace(redirectTo);
+      } else if (!hasPermission(allowedRoles)) {
+        router.replace('/unauthorized');
+      }
     }
-  }, [isLoading, user, hasPermission, allowedRoles, redirectTo]);
+  }, [isLoading, user, hasPermission, allowedRoles, redirectTo, router]);
   
-  // While loading, show nothing or a loading indicator
+  // While loading, show a loading indicator
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
   
   // If user has permission, render the children
@@ -34,6 +44,10 @@ export function ProtectedRoute({
     return <>{children}</>;
   }
   
-  // This should not be reached due to the redirect in useEffect
-  return null;
+  // Show loading while redirecting
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 } 

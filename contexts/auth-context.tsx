@@ -2,198 +2,162 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
-import { Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import { UserProfile, UserRole } from '@/types/auth';
 
-type UserProfile = {
-  id: string;
-  username: string;
-  role: string;
-};
-
-type AuthContextType = {
-  user: User | null;
-  profile: UserProfile | null;
-  session: Session | null;
+// Define auth context type
+interface AuthContextType {
+  user: UserProfile | null;
   isLoading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-  hasPermission: (roles: string[]) => boolean;
-  hasAnyPermission: (roles: string[]) => boolean;
-};
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  hasPermission: (roles: UserRole[]) => boolean;
+}
 
+// Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [supabase] = useState(() => createBrowserSupabaseClient());
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Fetch user profile from the database
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      console.log('Fetching profile for user:', userId);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, role')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return null;
-      }
-
-      console.log('Profile fetched successfully:', data);
-      return data as UserProfile;
-    } catch (error) {
-      console.error('Error in fetchUserProfile:', error);
-      return null;
-    }
-  };
-
-  const refreshProfile = async () => {
-    if (!user) return;
-    
-    const profile = await fetchUserProfile(user.id);
-    setProfile(profile);
-  };
-
-  // Check if user has all required roles
-  const hasPermission = (roles: string[]): boolean => {
-    if (!profile) return false;
-    if (!roles || roles.length === 0) return true; // No roles required
-    return roles.includes(profile.role);
-  };
-
-  // Check if user has any of the required roles
-  const hasAnyPermission = (roles: string[]): boolean => {
-    if (!profile) return false;
-    if (!roles || roles.length === 0) return true; // No roles required
-    return roles.includes(profile.role);
-  };
-
+  // Load user from localStorage on mount
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
       try {
-        console.log('Getting initial session...');
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Initial session:', session ? 'exists' : 'null');
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          const profile = await fetchUserProfile(session.user.id);
-          setProfile(profile);
-        }
+        setUser(JSON.parse(storedUser));
       } catch (error) {
-        console.error('Error getting initial session:', error);
-      } finally {
-        setIsLoading(false);
+        console.error('Failed to parse stored user:', error);
+        localStorage.removeItem('user');
       }
-    };
+    }
+    setIsLoading(false);
+  }, []);
 
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event);
-        console.log('New session:', session ? 'exists' : 'null');
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          const profile = await fetchUserProfile(session.user.id);
-          setProfile(profile);
-        } else {
-          setProfile(null);
-        }
-
-        setIsLoading(false);
-      }
-    );
+  // Check if user has the required role
+  const hasPermission = (roles: UserRole[]): boolean => {
+    if (!user) return false;
+    if (!roles || roles.length === 0) return true; // No roles required
     
-    // Clean up subscription
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [supabase]);
+    // Case-insensitive role comparison
+    return roles.some(role => 
+      user.role.toUpperCase() === role.toUpperCase()
+    );
+  };
 
-  const signOut = async () => {
+  // Login function
+  const login = async (username: string, password: string) => {
+    setIsLoading(true);
     try {
-      console.log("Signing out...");
-      
-      // First, sign out from Supabase
-      await supabase.auth.signOut({ scope: 'global' });
-      
-      // Then clear all auth state
-      setUser(null);
-      setProfile(null);
-      setSession(null);
-      
-      // Then clear storage
-      if (typeof window !== 'undefined') {
-        // Clear all Supabase-related items
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (key.startsWith('supabase.') || key.startsWith('sb-'))) {
-            keysToRemove.push(key);
-          }
-        }
-        // Remove keys in a separate loop to avoid index shifting issues
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-        sessionStorage.clear();
-        
-        // Clear cookies related to auth
-        document.cookie.split(';').forEach(cookie => {
-          const [name] = cookie.trim().split('=');
-          if (name.includes('supabase') || name.includes('sb-')) {
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`;
-          }
-        });
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
       }
+
+      // Store user in state and localStorage
+      setUser(data.user);
+      localStorage.setItem('user', JSON.stringify(data.user));
       
-      // Force a hard navigation to login page with cache busting
-      const timestamp = new Date().getTime();
-      window.location.href = `/login?t=${timestamp}`;
+      // Navigate to appropriate dashboard based on role
+      if (data.user.role.toUpperCase() === 'MARKETING OPS') {
+        router.push('/marketing-ops-finalized-commission');
+      } else if (data.user.role.toUpperCase() === 'COMPLIANCE') {
+        router.push('/compliance-checklist');
+      } else if (data.user.role.toUpperCase() === 'ADMIN') {
+        router.push('/compliance-checklist');
+      } else {
+        // Default for MARKETING role and any other roles
+        router.push('/reports');
+      }
     } catch (error) {
-      console.error("Error during sign out:", error);
-      // Still redirect even if there's an error
-      window.location.href = '/login';
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        session,
-        isLoading,
-        signOut,
-        refreshProfile,
-        hasPermission,
-        hasAnyPermission,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  // Update Password function
+  const updatePassword = async (currentPassword: string, newPassword: string) => {
+    if (!user) {
+      throw new Error('User not logged in');
+    }
+    
+    try {
+      const response = await fetch('/api/auth/update-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: user.username,
+          currentPassword,
+          newPassword
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Password update failed');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Password update error:', error);
+      throw error;
+    }
+  };
+
+  // Logout function
+  const logout = async () => {
+    setIsLoading(true);
+    try {
+      console.log('Logging out user...');
+      // Clear user from state and localStorage
+      setUser(null);
+      localStorage.removeItem('user');
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Context value
+  const value = {
+    user,
+    isLoading,
+    login,
+    logout,
+    signOut: logout,
+    updatePassword,
+    hasPermission,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
+// Custom hook to use auth context
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};

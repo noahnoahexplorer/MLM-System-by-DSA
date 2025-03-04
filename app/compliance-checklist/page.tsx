@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import ComplianceCheckList from "@/components/compliance-checklist/compliance-checklist";
 
 export const metadata: Metadata = {
-  title: "Compliance Check List | BK8 MLM System",
+  title: "Compliance Check List | Profit Buddies",
   description: "Verify compliance for commission payments",
 };
 

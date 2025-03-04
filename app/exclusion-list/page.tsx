@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import ExclusionListManager from "@/components/exclusion-list/exclusion-list-manager";
 
 export const metadata: Metadata = {
-  title: "Exclusion List | BK8 MLM System",
+  title: "Exclusion List | Profit Buddies",
   description: "Manage excluded referees for commission calculations",
 };
 

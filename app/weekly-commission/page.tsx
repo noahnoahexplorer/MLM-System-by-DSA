@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import WeeklyCommissionList from "@/components/weekly-commission/weekly-commission-list";
 
 export const metadata: Metadata = {
-  title: "Weekly Commission List | BK8 MLM System",
+  title: "Weekly Commission List | Profit Buddies",
   description: "Export Weekly Commission Data",
 };
 

@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import FinanceOverview from "@/components/finance/finance-overview";
 
 export const metadata: Metadata = {
-  title: "Finance | BK8 MLM System",
+  title: "Finance | Profit Buddies",
   description: "Commission and NGR Overview",
 };
 

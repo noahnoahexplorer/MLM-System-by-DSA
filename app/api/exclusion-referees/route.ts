@@ -26,7 +26,7 @@ export async function GET() {
       SELECT DISTINCT
         RELATIVE_LEVEL_REFEREE_LOGIN as REFEREE_LOGIN,
         MEMBER_LOGIN as REFERRER_LOGIN
-      FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION_DETAILS
+      FROM PROD_ALPHATEL.PRESENTATION.MLM_DAILY_COMMISSION
       WHERE RELATIVE_LEVEL_REFEREE_LOGIN IN (${exclusions.map(e => `'${e.REFEREE_LOGIN}'`).join(',') || "''"})
     `;
     
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     // Validate that the referee login exists in the system
     const validateRefereeQuery = `
       SELECT COUNT(*) AS REFEREE_COUNT
-      FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION_DETAILS
+      FROM PROD_ALPHATEL.PRESENTATION.MLM_DAILY_COMMISSION
       WHERE RELATIVE_LEVEL_REFEREE_LOGIN = '${refereeLogin}'
     `;
     

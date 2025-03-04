@@ -1,33 +1,37 @@
-import { redirect } from 'next/navigation';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+'use client';
 
-export default async function Home() {
-  const cookieStore = cookies();
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
+import { Loader2 } from 'lucide-react';
+
+export default function Home() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
   
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: any) {
-          // This is a server component, we don't set cookies here
-        },
-        remove(name: string, options: any) {
-          // This is a server component, we don't remove cookies here
-        },
-      },
+  useEffect(() => {
+    if (!isLoading) {
+      if (user) {
+        // Redirect based on user role
+        if (user.role.toUpperCase() === 'MARKETING OPS') {
+          router.push('/marketing-ops-finalized-commission');
+        } else if (user.role.toUpperCase() === 'COMPLIANCE') {
+          router.push('/compliance-checklist');
+        } else if (user.role.toUpperCase() === 'ADMIN') {
+          router.push('/compliance-checklist');
+        } else {
+          // Default for MARKETING role and any other roles
+          router.push('/reports');
+        }
+      } else {
+        router.push('/login');
+      }
     }
-  );
+  }, [user, isLoading, router]);
   
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (!session) {
-    redirect("/login");
-  } else {
-    redirect("/weekly-commission");
-  }
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 }
