@@ -46,14 +46,14 @@ export async function POST(request: NextRequest) {
         permissions = 'members,reports';
     }
 
-    // Update user role in Snowflake
+    // Update user role in Snowflake using parameterized query
     const updateQuery = `
       UPDATE DEV_DSA.PRESENTATION.USER_AUTH
-      SET ROLE = '${role}', PERMISSIONS = '${permissions}', UPDATED_AT = CURRENT_TIMESTAMP()
-      WHERE MEMBER_ID = '${userId}'
+      SET ROLE = ?, PERMISSIONS = ?, UPDATED_AT = CURRENT_TIMESTAMP()
+      WHERE MEMBER_ID = ?
     `;
 
-    await executeQuery(updateQuery);
+    await executeQuery(updateQuery, [role, permissions, userId]);
 
     return NextResponse.json({
       message: 'User role updated successfully'
