@@ -1,11 +1,11 @@
 import snowflake from 'snowflake-sdk';
 
 const snowflakeConfig = {
-  account: process.env.SNOWFLAKE_ACCOUNT,
-  username: process.env.SNOWFLAKE_USERNAME,
-  password: process.env.SNOWFLAKE_PASSWORD,
-  database: process.env.SNOWFLAKE_DATABASE,
-  warehouse: process.env.SNOWFLAKE_WAREHOUSE,
+  account: process.env.SNOWFLAKE_ACCOUNT || '',
+  username: process.env.SNOWFLAKE_USERNAME || '',
+  password: process.env.SNOWFLAKE_PASSWORD || '',
+  database: process.env.SNOWFLAKE_DATABASE || '',
+  warehouse: process.env.SNOWFLAKE_WAREHOUSE || '',
   clientSessionKeepAlive: false,
   keepAlive: false
 };
