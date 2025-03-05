@@ -8,7 +8,7 @@ import { RootLayoutClient } from '@/components/layout/root-layout-client';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'BK8 MLM Dashboard',
+  title: 'Profit Buddies!',
   description: 'Modern MLM Management System',
 };
 
