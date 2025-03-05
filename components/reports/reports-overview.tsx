@@ -122,6 +122,14 @@ const formatYAxisInMillions = (value: number) => {
   return `$${(value / 1000000).toFixed(1)}M`;
 };
 
+// Custom formatter for Y-axis values that switches between K and M appropriately
+const formatYAxisDynamic = (value: number) => {
+  if (value === 0) return '$0';
+  if (Math.abs(value) < 1000) return `$${value}`;
+  if (Math.abs(value) < 1000000) return `$${(value / 1000).toFixed(0)}K`;
+  return `$${(value / 1000000).toFixed(1)}M`;
+};
+
 // Add this function to calculate percentage change
 const calculatePercentageChange = (current: number, previous: number) => {
   if (previous === 0) return current > 0 ? 100 : 0;
@@ -542,7 +550,7 @@ export default function ReportsOverview() {
                     />
                     <YAxis 
                       yAxisId="left"
-                      tickFormatter={formatYAxisInThousands}
+                      tickFormatter={formatYAxisDynamic}
                       stroke={CHART_COLORS.primary}
                     />
                     <YAxis 
@@ -609,7 +617,7 @@ export default function ReportsOverview() {
                         tickFormatter={(value: string) => new Date(value).toLocaleDateString('default', { month: 'short' })}
                       />
                       <YAxis 
-                        tickFormatter={(value) => formatYAxisInThousands(value)} 
+                        tickFormatter={(value) => formatYAxisDynamic(value)} 
                       />
                       <Tooltip 
                         formatter={(value) => formatCurrency(Number(value))}
@@ -650,7 +658,7 @@ export default function ReportsOverview() {
                       />
                       <YAxis 
                         yAxisId="left" 
-                        tickFormatter={(value) => formatYAxisInMillions(value)} 
+                        tickFormatter={(value) => formatYAxisDynamic(value)} 
                       />
                       <YAxis yAxisId="right" orientation="right" />
                       <Tooltip 
