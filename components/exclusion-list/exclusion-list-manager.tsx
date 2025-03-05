@@ -32,6 +32,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ExclusionAuditLog from "./exclusion-audit-log";
 
 interface ExcludedReferee {
   ID: number;
@@ -73,6 +75,7 @@ export default function ExclusionListManager() {
   const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("exclusions");
   
   // Form states
   const [newExclusion, setNewExclusion] = useState({
@@ -207,6 +210,7 @@ export default function ExclusionListManager() {
           isActive: editingExclusion.IS_ACTIVE,
           exclusionReason: editingExclusion.EXCLUSION_REASON,
           endDate: editingExclusion.END_DATE,
+          actionBy: editingExclusion.EXCLUDED_BY,
         }),
       });
       
@@ -240,115 +244,128 @@ export default function ExclusionListManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2 w-full max-w-sm">
-          <div className="relative w-full">
-            <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
-              <Search className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <Input
-              placeholder="Search by referee or excluded by..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full pl-8"
-            />
-          </div>
-        </div>
+      <Tabs defaultValue="exclusions" onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="exclusions">Exclusion List</TabsTrigger>
+          <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+        </TabsList>
         
-        <div className="flex items-center space-x-6">
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="active-only"
-              checked={showActiveOnly}
-              onCheckedChange={handleActiveFilterChange}
-            />
-            <Label htmlFor="active-only">Show active only</Label>
+        <TabsContent value="exclusions" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 w-full max-w-sm">
+              <div className="relative w-full">
+                <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <Input
+                  placeholder="Search by referee or excluded by..."
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  className="w-full pl-8"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="active-only"
+                  checked={showActiveOnly}
+                  onCheckedChange={handleActiveFilterChange}
+                />
+                <Label htmlFor="active-only">Show active only</Label>
+              </div>
+              
+              <Button onClick={fetchExclusions} variant="outline" size="icon">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Exclusion
+              </Button>
+            </div>
           </div>
           
-          <Button onClick={fetchExclusions} variant="outline" size="icon">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Exclusion
-          </Button>
-        </div>
-      </div>
-      
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Important Note</AlertTitle>
-        <AlertDescription>
-          Exclusions are never deleted from the system for audit purposes. To remove a referee from the exclusion list, set their status to inactive.
-        </AlertDescription>
-      </Alert>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Important Note</AlertTitle>
+            <AlertDescription>
+              Exclusions are never deleted from the system for audit purposes. To remove a referee from the exclusion list, set their status to inactive.
+            </AlertDescription>
+          </Alert>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Excluded Referees</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredExclusions.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Referee Login</TableHead>
-                  <TableHead>Referrer</TableHead>
-                  <TableHead>Excluded By</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>End Date</TableHead>
-                  <TableHead>Exclusion Date</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredExclusions.map((exclusion) => (
-                  <TableRow key={exclusion.ID}>
-                    <TableCell>
-                      <Badge variant={exclusion.IS_ACTIVE ? "default" : "outline"}>
-                        {exclusion.IS_ACTIVE ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{exclusion.REFEREE_LOGIN}</TableCell>
-                    <TableCell>{exclusion.REFERRER_LOGIN || "-"}</TableCell>
-                    <TableCell>{exclusion.EXCLUDED_BY}</TableCell>
-                    <TableCell>{new Date(exclusion.START_DATE).toLocaleDateString()}</TableCell>
-                    <TableCell>{new Date(exclusion.END_DATE).toLocaleDateString()}</TableCell>
-                    <TableCell>{new Date(exclusion.EXCLUSION_DATE).toLocaleString()}</TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {exclusion.EXCLUSION_REASON || "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingExclusion(exclusion);
-                          setIsEditDialogOpen(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="flex justify-center py-8 text-muted-foreground">
-              No exclusions found matching your criteria
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Excluded Referees</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredExclusions.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Referee Login</TableHead>
+                      <TableHead>Referrer</TableHead>
+                      <TableHead>Excluded By</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead>Exclusion Date</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExclusions.map((exclusion) => (
+                      <TableRow key={exclusion.ID}>
+                        <TableCell>
+                          <Badge variant={exclusion.IS_ACTIVE ? "default" : "outline"}>
+                            {exclusion.IS_ACTIVE ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{exclusion.REFEREE_LOGIN}</TableCell>
+                        <TableCell>{exclusion.REFERRER_LOGIN || "-"}</TableCell>
+                        <TableCell>{exclusion.EXCLUDED_BY}</TableCell>
+                        <TableCell>{new Date(exclusion.START_DATE).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(exclusion.END_DATE).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(exclusion.EXCLUSION_DATE).toLocaleString()}</TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {exclusion.EXCLUSION_REASON || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingExclusion(exclusion);
+                              setIsEditDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="flex justify-center py-8 text-muted-foreground">
+                  No exclusions found matching your criteria
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="audit" className="mt-6">
+          <ExclusionAuditLog />
+        </TabsContent>
+      </Tabs>
 
       {/* Add Exclusion Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
