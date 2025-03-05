@@ -42,40 +42,29 @@ export async function GET(request: Request) {
       : `
         WITH MonthlyTrends AS (
           SELECT 
-            DATE_TRUNC('MONTH', START_DATE) as REPORT_MONTH,
+            DATE_TRUNC('MONTH', START_DATE) as REPORT_DATE,
             SUM(LOCAL_COMMISSION_AMOUNT) as TOTAL_COMMISSION,
             COUNT(DISTINCT RELATIVE_LEVEL_REFEREE_LOGIN) as UNIQUE_REFEREES,
             SUM(TOTAL_WIN_LOSS) as TOTAL_NGR
           FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION
-          WHERE START_DATE >= DATEADD(month, -${compareMonths - 1}, DATE_TRUNC('MONTH', TO_DATE('${year}-${month.padStart(2, '0')}-01')))
+          WHERE 
+            YEAR(START_DATE) = ${year}
           GROUP BY DATE_TRUNC('MONTH', START_DATE)
         )
         SELECT 
-          TO_VARCHAR(REPORT_MONTH, 'YYYY-MM') as MONTH,
+          TO_VARCHAR(REPORT_DATE, 'YYYY-MM') as MONTH,
           TOTAL_COMMISSION,
           UNIQUE_REFEREES,
           TOTAL_NGR
         FROM MonthlyTrends
-        ORDER BY REPORT_MONTH ASC
+        ORDER BY REPORT_DATE ASC
       `;
 
-    // Enhanced report query to handle any number of levels
+    // Query for the specific month's report
     const reportQuery = `
-      WITH LevelStats AS (
+      WITH MonthlyReport AS (
         SELECT 
-          DATE_TRUNC('MONTH', START_DATE) as REPORT_MONTH,
-          RELATIVE_LEVEL,
-          SUM(LOCAL_COMMISSION_AMOUNT) as LEVEL_COMMISSION,
-          COUNT(DISTINCT RELATIVE_LEVEL_REFEREE_LOGIN) as LEVEL_REFEREES
-        FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION
-        WHERE 
-          YEAR(START_DATE) = ${year}
-          AND MONTH(START_DATE) = ${month}
-        GROUP BY DATE_TRUNC('MONTH', START_DATE), RELATIVE_LEVEL
-      ),
-      MonthlyStats AS (
-        SELECT 
-          DATE_TRUNC('MONTH', START_DATE) as REPORT_MONTH,
+          TO_VARCHAR(DATE_TRUNC('MONTH', START_DATE), 'YYYY-MM') as MONTH,
           SUM(LOCAL_COMMISSION_AMOUNT) as TOTAL_COMMISSION,
           COUNT(DISTINCT RELATIVE_LEVEL_REFEREE_LOGIN) as UNIQUE_REFEREES,
           SUM(TOTAL_DEPOSIT_AMOUNT) as TOTAL_DEPOSITS,
@@ -87,45 +76,39 @@ export async function GET(request: Request) {
           AND MONTH(START_DATE) = ${month}
         GROUP BY DATE_TRUNC('MONTH', START_DATE)
       ),
-      ComparisonStats AS (
+      LevelBreakdown AS (
         SELECT 
-          DATE_TRUNC('MONTH', START_DATE) as REPORT_MONTH,
-          SUM(LOCAL_COMMISSION_AMOUNT) as TOTAL_COMMISSION,
-          COUNT(DISTINCT RELATIVE_LEVEL_REFEREE_LOGIN) as UNIQUE_REFEREES
+          RELATIVE_LEVEL as LEVEL,
+          SUM(LOCAL_COMMISSION_AMOUNT) as COMMISSION,
+          COUNT(DISTINCT RELATIVE_LEVEL_REFEREE_LOGIN) as REFEREES
         FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION
         WHERE 
-          START_DATE >= DATEADD(month, -12, DATE_TRUNC('MONTH', TO_DATE('${year}-${month.padStart(2, '0')}-01')))
-        GROUP BY DATE_TRUNC('MONTH', START_DATE)
+          YEAR(START_DATE) = ${year}
+          AND MONTH(START_DATE) = ${month}
+          AND RELATIVE_LEVEL IS NOT NULL
+        GROUP BY RELATIVE_LEVEL
       )
       SELECT 
-        TO_VARCHAR(ms.REPORT_MONTH, 'YYYY-MM') as MONTH,
-        ms.TOTAL_COMMISSION,
-        ms.UNIQUE_REFEREES,
-        ms.TOTAL_DEPOSITS,
-        ms.TOTAL_TURNOVER,
-        ms.TOTAL_NGR,
-        ms.TOTAL_COMMISSION / NULLIF(ms.UNIQUE_REFEREES, 0) as AVG_COMMISSION,
-        ARRAY_AGG(OBJECT_CONSTRUCT(
-          'level', ls.RELATIVE_LEVEL,
-          'commission', ls.LEVEL_COMMISSION,
-          'referees', ls.LEVEL_REFEREES
-        )) as LEVEL_BREAKDOWN
-      FROM MonthlyStats ms
-      LEFT JOIN LevelStats ls ON ms.REPORT_MONTH = ls.REPORT_MONTH
-      GROUP BY 
-        ms.REPORT_MONTH,
-        ms.TOTAL_COMMISSION,
-        ms.UNIQUE_REFEREES,
-        ms.TOTAL_DEPOSITS,
-        ms.TOTAL_TURNOVER,
-        ms.TOTAL_NGR
+        r.MONTH,
+        r.TOTAL_COMMISSION,
+        r.UNIQUE_REFEREES,
+        r.TOTAL_COMMISSION / NULLIF(r.UNIQUE_REFEREES, 0) as AVG_COMMISSION,
+        r.TOTAL_DEPOSITS,
+        r.TOTAL_TURNOVER,
+        r.TOTAL_NGR,
+        (
+          SELECT ARRAY_AGG(OBJECT_CONSTRUCT('level', LEVEL, 'commission', COMMISSION, 'referees', REFEREES))
+          FROM LevelBreakdown
+        ) as LEVEL_BREAKDOWN
+      FROM MonthlyReport r
     `;
 
-    // Get month-by-month comparison data
+    // Query for comparison data (last X months)
     const comparisonQuery = `
       WITH MonthlyComparison AS (
         SELECT 
-          DATE_TRUNC('MONTH', START_DATE) as REPORT_MONTH,
+          DATE_TRUNC('MONTH', START_DATE) as REPORT_DATE,
+          TO_VARCHAR(DATE_TRUNC('MONTH', START_DATE), 'YYYY-MM') as MONTH,
           SUM(LOCAL_COMMISSION_AMOUNT) as TOTAL_COMMISSION,
           COUNT(DISTINCT RELATIVE_LEVEL_REFEREE_LOGIN) as UNIQUE_REFEREES,
           SUM(TOTAL_DEPOSIT_AMOUNT) as TOTAL_DEPOSITS,
@@ -133,19 +116,20 @@ export async function GET(request: Request) {
           SUM(TOTAL_WIN_LOSS) as TOTAL_NGR
         FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION
         WHERE 
-          START_DATE >= DATEADD(month, -12, DATE_TRUNC('MONTH', TO_DATE('${year}-${month.padStart(2, '0')}-01')))
+          REPORT_DATE >= DATEADD(MONTH, -${compareMonths}, DATE_TRUNC('MONTH', TO_DATE('${year}-${month}-01')))
+          AND REPORT_DATE <= DATE_TRUNC('MONTH', TO_DATE('${year}-${month}-01'))
         GROUP BY DATE_TRUNC('MONTH', START_DATE)
       )
       SELECT 
-        TO_VARCHAR(REPORT_MONTH, 'YYYY-MM') as MONTH,
+        MONTH,
         TOTAL_COMMISSION,
         UNIQUE_REFEREES,
+        TOTAL_COMMISSION / NULLIF(UNIQUE_REFEREES, 0) as AVG_COMMISSION,
         TOTAL_DEPOSITS,
         TOTAL_TURNOVER,
-        TOTAL_NGR,
-        TOTAL_COMMISSION / NULLIF(UNIQUE_REFEREES, 0) as AVG_COMMISSION
+        TOTAL_NGR
       FROM MonthlyComparison
-      ORDER BY REPORT_MONTH ASC
+      ORDER BY REPORT_DATE ASC
     `;
 
     const [reportData, trendsData, comparisonData] = await Promise.all([
@@ -163,8 +147,11 @@ export async function GET(request: Request) {
       referees: number;
     }
     
+    // Fix: Check if LEVEL_BREAKDOWN is already an object before parsing
     const levelBreakdown = report?.LEVEL_BREAKDOWN 
-      ? JSON.parse(report.LEVEL_BREAKDOWN)
+      ? (typeof report.LEVEL_BREAKDOWN === 'string' 
+          ? JSON.parse(report.LEVEL_BREAKDOWN)
+          : report.LEVEL_BREAKDOWN)
           .filter((level: any) => level.level !== null)
           .sort((a: LevelData, b: LevelData) => a.level - b.level)
       : [];
