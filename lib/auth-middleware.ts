@@ -65,7 +65,7 @@ export function requireAdmin(handler: Function) {
   return async (request: NextRequest) => {
     const auth = await verifyAuth(request);
     
-    if (!auth.isAuthenticated) {
+    if (!auth.isAuthenticated || !auth.user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
