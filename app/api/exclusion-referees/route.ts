@@ -130,6 +130,27 @@ export async function POST(request: Request) {
     
     await executeQuery(query);
     
+    // Log this action in the audit table
+    const logQuery = `
+      INSERT INTO DEV_ALPHATEL.PRESENTATION.MLM_EXCLUSION_AUDIT_LOG (
+        REFEREE_LOGIN,
+        ACTION_TYPE,
+        ACTION_BY,
+        ACTION_DETAILS,
+        PREVIOUS_STATE,
+        NEW_STATE
+      ) VALUES (
+        '${refereeLogin}',
+        'CREATE',
+        '${excludedBy}',
+        'Added to exclusion list with reason: ${exclusionReason || "No reason provided"}',
+        'Not excluded',
+        'Excluded from ${startDate} to ${endDate}'
+      )
+    `;
+    
+    await executeQuery(logQuery);
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error adding exclusion:', error);
