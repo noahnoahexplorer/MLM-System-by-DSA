@@ -70,6 +70,7 @@ export async function GET(request: Request) {
         FROM PROD_ALPHATEL.PRESENTATION.MLM_DAILY_COMMISSION
         WHERE DATE(START_DATE) = '${startDate}'
         AND DATE(END_DATE) = '${endDate}'
+        AND IS_LATEST = 'TRUE'
         ${exclusionCondition}
         GROUP BY
           START_DATE,

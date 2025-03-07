@@ -197,10 +197,10 @@ export default function FinalizedCommissionList() {
   const handleExport = () => {
     if (!filteredData.length) return;
 
-    // Create Excel-compatible content
-    let excelContent = '';
+    // Create CSV content
+    let csvContent = '';
     const BOM = '\uFEFF';
-    excelContent += BOM;
+    csvContent += BOM;
 
     // Add headers
     const headers = [
@@ -215,12 +215,21 @@ export default function FinalizedCommissionList() {
       '1xturnover',
       'multiplier'
     ];
-    excelContent += headers.join(',') + '\n';
+    csvContent += headers.join(',') + '\n';
 
-    // Add data rows with proper Excel formatting
+    // Add data rows with proper CSV formatting
     filteredData.forEach(row => {
-      const startDate = row.START_DATE.split(' ')[0]; // Extract only the date part
-      const endDate = row.END_DATE.split(' ')[0];     // Extract only the date part
+      // Format dates as MM/DD/YYYY
+      const formatDateToMMDDYYYY = (dateStr: string) => {
+        const date = new Date(dateStr);
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const year = date.getFullYear();
+        return `${month}/${day}/${year}`;
+      };
+
+      const startDate = formatDateToMMDDYYYY(row.START_DATE);
+      const endDate = formatDateToMMDDYYYY(row.END_DATE);
       
       const rowData = [
         `"${row.MEMBER_LOGIN}"`,
@@ -234,19 +243,18 @@ export default function FinalizedCommissionList() {
         '"no"',
         ''
       ];
-      excelContent += rowData.join(',') + '\n';
+      csvContent += rowData.join(',') + '\n';
     });
 
     // Create and trigger download
-    const blob = new Blob([excelContent], { 
-      type: 'application/vnd.ms-excel;charset=utf-8;' 
+    const blob = new Blob([csvContent], { 
+      type: 'text/csv;charset=utf-8;' 
     });
     const link = document.createElement('a');
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      // Change extension to .xls for better Excel compatibility
-      link.setAttribute('download', `finalized_commission_${selectedWeek}.xls`);
+      link.setAttribute('download', `finalized_commission_${selectedWeek}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
