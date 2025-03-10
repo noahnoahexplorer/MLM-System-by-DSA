@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   try {
     // Check if already submitted
     const submissionQuery = `
-      SELECT SUBMISSION_DATE
+      SELECT SUBMISSION_DATE, SUBMITTED_BY
       FROM DEV_ALPHATEL.PRESENTATION.MLM_SUBMISSION_HISTORY
       WHERE DATE(START_DATE) = '${startDate}'
       AND DATE(END_DATE) = '${endDate}'
@@ -27,10 +27,12 @@ export async function GET(request: Request) {
     const submissionResult = await executeQuery(submissionQuery);
     const isSubmitted = submissionResult.length > 0;
     const submissionDate = isSubmitted ? submissionResult[0].SUBMISSION_DATE : null;
+    const submittedBy = isSubmitted ? submissionResult[0].SUBMITTED_BY : null;
     
     return NextResponse.json({ 
       isSubmitted,
-      submissionDate
+      submissionDate,
+      submittedBy
     });
   } catch (error) {
     console.error('Error checking submission status:', error);
