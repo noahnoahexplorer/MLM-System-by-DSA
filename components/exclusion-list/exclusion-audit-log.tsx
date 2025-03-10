@@ -116,6 +116,8 @@ export default function ExclusionAuditLog() {
         return <Badge className="bg-blue-500">UPDATE</Badge>;
       case 'DELETE':
         return <Badge className="bg-red-500">DELETE</Badge>;
+      case 'SUBMIT':
+        return <Badge className="bg-purple-500">SUBMIT</Badge>;
       default:
         return <Badge>{actionType}</Badge>;
     }

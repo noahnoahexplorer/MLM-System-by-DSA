@@ -131,6 +131,8 @@ export default function ComplianceCheckList() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submissionDate, setSubmissionDate] = useState<string | null>(null);
+  const [checkerName, setCheckerName] = useState('');
+  const [submittedBy, setSubmittedBy] = useState<string | null>(null);
 
   const fetchData = useCallback(async (weekValue: string) => {
     setLoading(true);
@@ -496,6 +498,16 @@ export default function ComplianceCheckList() {
   const handleSubmitToMarketingOps = async () => {
     if (!selectedWeek) return;
     
+    // Validate checker name
+    if (!checkerName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter the checker name",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       const [startDate, endDate] = selectedWeek.split('_');
@@ -508,7 +520,7 @@ export default function ComplianceCheckList() {
         body: JSON.stringify({
           startDate,
           endDate,
-          submittedBy: 'compliance-team', // This could be dynamic based on user authentication
+          submittedBy: checkerName, // Use the checker name instead of hardcoded value
           submissionDate: new Date().toISOString(), // Add the current timestamp
         }),
       });
@@ -521,6 +533,7 @@ export default function ComplianceCheckList() {
       
       setIsSubmitted(true);
       setSubmissionDate(result.submissionDate);
+      setSubmittedBy(result.submittedBy || null);
       toast({
         title: "Success",
         description: "Data has been submitted to Marketing Ops and is now finalized.",
@@ -537,7 +550,7 @@ export default function ComplianceCheckList() {
     }
   };
 
-  // Update the effect to check submission status to also fetch the submission date
+  // Update the effect to check submission status to also fetch the submission date and submitter
   useEffect(() => {
     if (selectedWeek) {
       const checkSubmissionStatus = async () => {
@@ -547,6 +560,7 @@ export default function ComplianceCheckList() {
           const data = await response.json();
           setIsSubmitted(data.isSubmitted);
           setSubmissionDate(data.submissionDate || null);
+          setSubmittedBy(data.submittedBy || null);
         } catch (error) {
           console.error('Error checking submission status:', error);
         }
@@ -670,7 +684,7 @@ export default function ComplianceCheckList() {
             {isSubmitted ? (
               <div className="inline-flex items-center rounded-full border border-green-500 bg-green-50 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:text-green-400">
                 <CheckCircle className="mr-1 h-4 w-4" />
-                Already Submitted {submissionDate && `on ${formatToGMT8(submissionDate)}`}
+                Already Submitted by {submittedBy} {submissionDate && `on ${formatToGMT8(submissionDate)}`}
               </div>
             ) : (
               <AlertDialog>
@@ -702,6 +716,24 @@ export default function ComplianceCheckList() {
                       )}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
+
+                  <div className="py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="checkerName" className="text-right">
+                        Checker Name
+                      </Label>
+                      <Input
+                        id="checkerName"
+                        name="checkerName"
+                        value={checkerName}
+                        onChange={(e) => setCheckerName(e.target.value)}
+                        className="col-span-3"
+                        required
+                        placeholder="Enter your name"
+                      />
+                    </div>
+                  </div>
+
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleSubmitToMarketingOps}>Submit</AlertDialogAction>

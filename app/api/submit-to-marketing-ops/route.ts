@@ -12,6 +12,13 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    if (!submittedBy || submittedBy.trim() === '') {
+      return NextResponse.json(
+        { error: 'Checker name is required' },
+        { status: 400 }
+      );
+    }
     
     // Check if already submitted
     const checkQuery = `
@@ -107,6 +114,30 @@ export async function POST(request: Request) {
     `;
     
     await executeQuery(submissionRecordQuery);
+    
+    // Add entry to the audit log table
+    const auditLogQuery = `
+      INSERT INTO DEV_ALPHATEL.PRESENTATION.MLM_EXCLUSION_AUDIT_LOG (
+        REFEREE_LOGIN,
+        ACTION_TYPE,
+        ACTION_BY,
+        ACTION_DETAILS,
+        PREVIOUS_STATE,
+        NEW_STATE,
+        ACTION_DATE
+      )
+      VALUES (
+        'system', -- Using 'system' as this is not specific to a referee
+        'SUBMIT',
+        '${submittedBy}',
+        'Submitted compliance data to Marketing Ops for period ${startDate} to ${endDate} with ${excludedReferees.length} excluded referees',
+        'Not submitted',
+        'Submitted to Marketing Ops',
+        CURRENT_TIMESTAMP()
+      )
+    `;
+    
+    await executeQuery(auditLogQuery);
     
     return NextResponse.json({ 
       success: true,
