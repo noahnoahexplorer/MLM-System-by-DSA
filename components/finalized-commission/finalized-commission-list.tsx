@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Download, Calendar, AlertCircle, RefreshCw, CheckCircle } from "lucide-react";
+import { Download, Calendar, AlertCircle, RefreshCw, CheckCircle, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -22,6 +22,8 @@ import { formatCurrency } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "@/components/ui/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 
 interface CommissionData {
   START_DATE: string;
@@ -82,6 +84,34 @@ const formatToGMT8 = (dateString: string): string => {
   });
 };
 
+// Replace the current getAdjustedDates function with this more general version
+const getAdjustedDates = (startDate: string, endDate: string): { adjustedStartDate: string, adjustedEndDate: string } => {
+  // Parse the input dates
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Add 8 days to the start date (move to the Monday after the next)
+  const adjustedStart = new Date(start);
+  adjustedStart.setDate(start.getDate() + 8);
+  
+  // Add 9 days to the end date
+  const adjustedEnd = new Date(end);
+  adjustedEnd.setDate(end.getDate() + 9);
+  
+  // Format dates back to YYYY-MM-DD format
+  const formatToYYYYMMDD = (date: Date) => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  return {
+    adjustedStartDate: formatToYYYYMMDD(adjustedStart),
+    adjustedEndDate: formatToYYYYMMDD(adjustedEnd)
+  };
+};
+
 export default function FinalizedCommissionList() {
   const [allData, setAllData] = useState<CommissionData[]>([]);
   const [filteredData, setFilteredData] = useState<CommissionData[]>([]);
@@ -96,6 +126,7 @@ export default function FinalizedCommissionList() {
     excludedRefereesCount: number;
     complianceVerificationDate?: string;
   } | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const fetchData = useCallback(async (weekValue: string, regenerate = false) => {
     setLoading(true);
@@ -193,9 +224,15 @@ export default function FinalizedCommissionList() {
     };
   };
 
-  // Export function
+  // Standard Export function (existing)
   const handleExport = () => {
-    if (!filteredData.length) return;
+    if (!filteredData.length || !selectedWeek) return;
+
+    // Get date range from selected week
+    const [startDate, endDate] = selectedWeek.split('_');
+    
+    // Get adjusted dates
+    const { adjustedStartDate, adjustedEndDate } = getAdjustedDates(startDate, endDate);
 
     // Create CSV content
     let csvContent = '';
@@ -228,13 +265,13 @@ export default function FinalizedCommissionList() {
         return `${month}/${day}/${year}`;
       };
 
-      const startDate = formatDateToMMDDYYYY(row.START_DATE);
-      const endDate = formatDateToMMDDYYYY(row.END_DATE);
+      const formattedStartDate = formatDateToMMDDYYYY(adjustedStartDate);
+      const formattedEndDate = formatDateToMMDDYYYY(adjustedEndDate);
       
       const rowData = [
         `"${row.MEMBER_LOGIN}"`,
-        `"${startDate}"`,
-        `"${endDate}"`,
+        `"${formattedStartDate}"`,
+        `"${formattedEndDate}"`,
         row.TOTAL_COMMISSION,
         '"Referral Program"',
         '"Referral rewards made special – enjoy this angpao!"',
@@ -263,6 +300,80 @@ export default function FinalizedCommissionList() {
     }
   };
 
+  // New export function with Member IDs - simplified to only include MEMBER_ID and memberLogin
+  const handleExportWithMemberIds = async () => {
+    if (!filteredData.length || !selectedWeek) return;
+
+    try {
+      // Get date range from selected week
+      const [startDate, endDate] = selectedWeek.split('_');
+      
+      // Fetch member data with IDs
+      const response = await fetch(
+        `/api/finalized-commission/member-id?startDate=${startDate}&endDate=${endDate}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      const memberData = result.members || [];
+      
+      // Create lookup map for member IDs
+      const memberIdMap = new Map();
+      memberData.forEach((member: { MEMBER_LOGIN: string, MEMBER_ID: string }) => {
+        memberIdMap.set(member.MEMBER_LOGIN, member.MEMBER_ID);
+      });
+
+      // Create CSV content
+      let csvContent = '';
+      const BOM = '\uFEFF';
+      csvContent += BOM;
+
+      // Add headers - ONLY MEMBER_ID and memberLogin
+      const headers = [
+        'MEMBER_ID',
+        'memberLogin'
+      ];
+      csvContent += headers.join(',') + '\n';
+
+      // Add data rows with proper CSV formatting - ONLY MEMBER_ID and memberLogin
+      filteredData.forEach(row => {
+        const memberId = memberIdMap.get(row.MEMBER_LOGIN) || '';
+        
+        const rowData = [
+          `"${memberId}"`,
+          `"${row.MEMBER_LOGIN}"`
+        ];
+        csvContent += rowData.join(',') + '\n';
+      });
+
+      // Create and trigger download
+      const blob = new Blob([csvContent], { 
+        type: 'text/csv;charset=utf-8;' 
+      });
+      const link = document.createElement('a');
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `member_ids_${selectedWeek}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Error exporting with member IDs:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data with member IDs. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -284,27 +395,46 @@ export default function FinalizedCommissionList() {
           </SelectContent>
         </Select>
         <div className="flex space-x-2">
-          <Button 
-            onClick={handleExport} 
-            disabled={loading || regenerating || !filteredData.length}
-            variant="outline"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
+          <Popover open={exportOpen} onOpenChange={setExportOpen}>
+            <PopoverTrigger asChild>
+              <Button 
+                disabled={loading || regenerating || !filteredData.length}
+                variant="outline"
+                className="flex items-center"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0" align="end">
+              <div className="p-1">
+                <button
+                  className="w-full px-2 py-1.5 text-sm text-left rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={() => {
+                    handleExport();
+                    setExportOpen(false);
+                  }}
+                >
+                  Standard Format
+                </button>
+                <button
+                  className="w-full px-2 py-1.5 text-sm text-left rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={() => {
+                    handleExportWithMemberIds();
+                    setExportOpen(false);
+                  }}
+                >
+                  With Member IDs
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
       {/* Generation date info */}
       <div className="mb-4">
-        {/* Remove the Last generated line */}
-        {/* <div className="flex items-center">
-          <p className="text-sm text-muted-foreground">
-            Last generated: {generationDate ? formatToGMT8(generationDate) : 'N/A'}
-          </p>
-        </div> */}
-        
-        {/* Keep only the compliance verification badge */}
         {submissionInfo && (
           <div className="inline-flex items-center rounded-full border border-green-500 bg-green-50 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/20 dark:text-green-400">
             <CheckCircle className="mr-1 h-4 w-4" />
@@ -433,22 +563,30 @@ export default function FinalizedCommissionList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredData.map((row, index) => (
-              <TableRow key={`${row.MEMBER_LOGIN}-${index}`}>
-                <TableCell>{row.MEMBER_LOGIN}</TableCell>
-                <TableCell>{row.START_DATE.split(' ')[0]}</TableCell>
-                <TableCell>{row.END_DATE.split(' ')[0]}</TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(row.TOTAL_COMMISSION, row.MEMBER_CURRENCY)}
-                </TableCell>
-                <TableCell>Referral Program</TableCell>
-                <TableCell>Referral rewards made special – enjoy this angpao!</TableCell>
-                <TableCell>Commission</TableCell>
-                <TableCell>MLM Referral Program Weekly Commission</TableCell>
-                <TableCell>no</TableCell>
-                <TableCell></TableCell>
-              </TableRow>
-            ))}
+            {filteredData.map((row, index) => {
+              // Get date range from selected week for table display
+              const [startDate, endDate] = selectedWeek.split('_');
+              
+              // Get adjusted dates
+              const { adjustedStartDate, adjustedEndDate } = getAdjustedDates(startDate, endDate);
+              
+              return (
+                <TableRow key={`${row.MEMBER_LOGIN}-${index}`}>
+                  <TableCell>{row.MEMBER_LOGIN}</TableCell>
+                  <TableCell>{adjustedStartDate}</TableCell>
+                  <TableCell>{adjustedEndDate}</TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(row.TOTAL_COMMISSION, row.MEMBER_CURRENCY)}
+                  </TableCell>
+                  <TableCell>Referral Program</TableCell>
+                  <TableCell>Referral rewards made special – enjoy this angpao!</TableCell>
+                  <TableCell>Commission</TableCell>
+                  <TableCell>MLM Referral Program Weekly Commission</TableCell>
+                  <TableCell>no</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       ) : (
