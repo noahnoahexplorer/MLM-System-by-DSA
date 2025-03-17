@@ -110,24 +110,24 @@ const CHART_STYLES = {
 
 // Custom formatter for Y-axis values in thousands (K)
 const formatYAxisInThousands = (value: number) => {
-  if (value === 0) return '$0';
-  if (Math.abs(value) < 1000) return `$${value}`;
-  return `$${(value / 1000).toFixed(0)}K`;
+  if (value === 0) return '₱0';
+  if (Math.abs(value) < 1000) return `₱${value}`;
+  return `₱${(value / 1000).toFixed(0)}K`;
 };
 
 // Custom formatter for Y-axis values in millions (M)
 const formatYAxisInMillions = (value: number) => {
-  if (value === 0) return '$0';
-  if (Math.abs(value) < 1000000) return `$${(value / 1000).toFixed(0)}K`;
-  return `$${(value / 1000000).toFixed(1)}M`;
+  if (value === 0) return '₱0';
+  if (Math.abs(value) < 1000000) return `₱${(value / 1000).toFixed(0)}K`;
+  return `₱${(value / 1000000).toFixed(1)}M`;
 };
 
 // Custom formatter for Y-axis values that switches between K and M appropriately
 const formatYAxisDynamic = (value: number) => {
-  if (value === 0) return '$0';
-  if (Math.abs(value) < 1000) return `$${value}`;
-  if (Math.abs(value) < 1000000) return `$${(value / 1000).toFixed(0)}K`;
-  return `$${(value / 1000000).toFixed(1)}M`;
+  if (value === 0) return '₱0';
+  if (Math.abs(value) < 1000) return `₱${value}`;
+  if (Math.abs(value) < 1000000) return `₱${(value / 1000).toFixed(0)}K`;
+  return `₱${(value / 1000000).toFixed(1)}M`;
 };
 
 // Add this function to calculate percentage change
@@ -208,7 +208,7 @@ export default function ReportsOverview() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'PHP',
     }).format(value);
   };
 
@@ -218,7 +218,7 @@ export default function ReportsOverview() {
     // If NGR is positive for the user, it's negative for the company and vice versa
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'PHP',
     }).format(Math.abs(value));
   };
 
