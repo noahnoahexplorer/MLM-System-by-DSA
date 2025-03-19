@@ -61,8 +61,8 @@ export async function GET(request: Request) {
       console.log('After executeQuery call');
       console.log(`Query returned ${complianceData ? complianceData.length : 0} rows`);
       
-      // In the GET function, make sure we're returning the correct data
-      const excludedRefereesQuery = `
+      // Fetch all excluded users (handles both referrers and referees)
+      const excludedUsersQuery = `
         SELECT REFEREE_LOGIN
         FROM DEV_ALPHATEL.PRESENTATION.MLM_EXCLUSION_REFEREES_LIST
         WHERE IS_ACTIVE = TRUE
@@ -73,13 +73,13 @@ export async function GET(request: Request) {
         )
       `;
 
-      const excludedReferees = await executeQuery(excludedRefereesQuery);
-      const excludedRefereeLogins = excludedReferees.map(row => row.REFEREE_LOGIN);
+      const excludedUsers = await executeQuery(excludedUsersQuery);
+      const excludedUserLogins = excludedUsers.map(row => row.REFEREE_LOGIN);
 
-      // Return the data
+      // Return the data - member status will be checked in UI against both referrer and referee fields
       return NextResponse.json({
         compliance: complianceData,
-        excludedReferees: excludedRefereeLogins,
+        excludedReferees: excludedUserLogins, // We keep the field name for backward compatibility 
         memberTotals: {}
       });
     } catch (queryError) {

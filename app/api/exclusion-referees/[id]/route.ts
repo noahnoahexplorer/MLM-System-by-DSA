@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/snowflake';
 
-// Update an exclusion
+// Update an exclusion for a user (affects both as referrer and referee)
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }

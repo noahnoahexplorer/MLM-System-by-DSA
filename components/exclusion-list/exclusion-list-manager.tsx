@@ -173,7 +173,7 @@ export default function ExclusionListManager() {
       
       toast({
         title: "Success",
-        description: "Referee has been added to the exclusion list.",
+        description: "User has been added to the exclusion list.",
       });
       
       setIsAddDialogOpen(false);
@@ -190,7 +190,7 @@ export default function ExclusionListManager() {
       console.error('Error adding exclusion:', error);
       toast({
         title: "Error",
-        description: "Failed to add referee to exclusion list. Please try again.",
+        description: "Failed to add user to exclusion list. Please try again.",
         variant: "destructive",
       });
     }
@@ -258,7 +258,7 @@ export default function ExclusionListManager() {
                   <Search className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <Input
-                  placeholder="Search by referee or excluded by..."
+                  placeholder="Search by username or excluded by..."
                   value={searchQuery}
                   onChange={handleSearchChange}
                   className="w-full pl-8"
@@ -269,11 +269,11 @@ export default function ExclusionListManager() {
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2">
                 <Switch
-                  id="active-only"
+                  id="show-active"
                   checked={showActiveOnly}
                   onCheckedChange={handleActiveFilterChange}
                 />
-                <Label htmlFor="active-only">Show active only</Label>
+                <Label htmlFor="show-active">Show active only</Label>
               </div>
               
               <Button onClick={fetchExclusions} variant="outline" size="icon">
@@ -291,13 +291,13 @@ export default function ExclusionListManager() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Important Note</AlertTitle>
             <AlertDescription>
-              Exclusions are never deleted from the system for audit purposes. To remove a referee from the exclusion list, set their status to inactive.
+              Exclusions are never deleted from the system for audit purposes. To remove a user from the exclusion list, set their status to inactive.
             </AlertDescription>
           </Alert>
 
           <Card>
             <CardHeader>
-              <CardTitle>Excluded Referees</CardTitle>
+              <CardTitle>Excluded Users</CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -309,7 +309,7 @@ export default function ExclusionListManager() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Status</TableHead>
-                      <TableHead>Referee Login</TableHead>
+                      <TableHead>Username</TableHead>
                       <TableHead>Referrer</TableHead>
                       <TableHead>Excluded By</TableHead>
                       <TableHead>Start Date</TableHead>
@@ -373,13 +373,13 @@ export default function ExclusionListManager() {
           <DialogHeader>
             <DialogTitle>Add New Exclusion</DialogTitle>
             <DialogDescription>
-              Add a referee to the exclusion list. They will be excluded from commission calculations.
+              Add a user to the exclusion list. They will be excluded from commission calculations as both a referrer and a referee.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="referee-login" className="text-right">
-                Referee Login *
+                Username *
               </Label>
               <div className="relative col-span-3">
                 <div className="absolute left-2 top-1/2 -translate-y-1/2">
@@ -455,14 +455,14 @@ export default function ExclusionListManager() {
           <DialogHeader>
             <DialogTitle>Edit Exclusion</DialogTitle>
             <DialogDescription>
-              Update the details for this excluded referee.
+              Update the details for this excluded user.
             </DialogDescription>
           </DialogHeader>
           {editingExclusion && (
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-referee-login" className="text-right">
-                  Referee Login
+                  Username
                 </Label>
                 <Input
                   id="edit-referee-login"

@@ -36,8 +36,8 @@ export async function POST(request: Request) {
       );
     }
     
-    // Get the list of excluded referees for this period
-    const excludedRefereesQuery = `
+    // Get the list of excluded users for this period (affects both referees and referrers)
+    const excludedUsersQuery = `
       SELECT REFEREE_LOGIN
       FROM DEV_ALPHATEL.PRESENTATION.MLM_EXCLUSION_REFEREES_LIST
       WHERE IS_ACTIVE = TRUE
@@ -48,13 +48,22 @@ export async function POST(request: Request) {
       )
     `;
     
-    const excludedRefereesResult = await executeQuery(excludedRefereesQuery);
-    const excludedReferees = excludedRefereesResult.map(row => row.REFEREE_LOGIN);
+    const excludedUsersResult = await executeQuery(excludedUsersQuery);
+    const excludedUsers = excludedUsersResult.map(row => row.REFEREE_LOGIN);
     
-    // Build the exclusion condition
+    // Build the exclusion condition - checking both referee and referrer
     let exclusionCondition = '';
-    if (excludedReferees.length > 0) {
-      exclusionCondition = `AND RELATIVE_LEVEL_REFEREE_LOGIN NOT IN ('${excludedReferees.join("','")}')`;
+    if (excludedUsers.length > 0) {
+      // Exclude records where either:
+      // 1. The referee is in the exclusion list
+      // 2. The referrer (MEMBER_LOGIN) is in the exclusion list
+      exclusionCondition = `
+        AND (
+          RELATIVE_LEVEL_REFEREE_LOGIN NOT IN ('${excludedUsers.join("','")}')
+          AND
+          MEMBER_LOGIN NOT IN ('${excludedUsers.join("','")}')
+        )
+      `;
     }
     
     // Insert new records with exclusions applied
@@ -109,7 +118,7 @@ export async function POST(request: Request) {
         '${endDate}',
         '${submittedBy}',
         CURRENT_TIMESTAMP(),
-        ${excludedReferees.length}
+        ${excludedUsers.length}
       )
     `;
     
@@ -130,7 +139,7 @@ export async function POST(request: Request) {
         'system', -- Using 'system' as this is not specific to a referee
         'SUBMIT',
         '${submittedBy}',
-        'Submitted compliance data to Marketing Ops for period ${startDate} to ${endDate} with ${excludedReferees.length} excluded referees',
+        'Submitted compliance data to Marketing Ops for period ${startDate} to ${endDate} with ${excludedUsers.length} excluded users (as both referrers and referees)',
         'Not submitted',
         'Submitted to Marketing Ops',
         CURRENT_TIMESTAMP()
@@ -142,7 +151,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: true,
       message: 'Data successfully submitted to Marketing Ops',
-      excludedRefereesCount: excludedReferees.length
+      excludedUsersCount: excludedUsers.length
     });
   } catch (error) {
     console.error('Error submitting to Marketing Ops:', error);
