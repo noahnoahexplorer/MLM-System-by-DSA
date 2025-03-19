@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/snowflake';
 
-// Get audit logs for exclusion operations
+// Get audit logs for user exclusion operations
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const refereeLogin = searchParams.get('referee');
+  const username = searchParams.get('referee');
   const limit = searchParams.get('limit') || '100';
   
   try {
     let whereClause = '';
-    if (refereeLogin) {
-      whereClause = `WHERE REFEREE_LOGIN = '${refereeLogin}'`;
+    if (username) {
+      whereClause = `WHERE REFEREE_LOGIN = '${username}'`;
     }
     
     const query = `

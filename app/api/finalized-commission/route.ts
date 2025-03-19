@@ -18,8 +18,8 @@ export async function GET(request: Request) {
 
     // Check if we need to regenerate the finalized list
     if (regenerate) {
-      // First, get the list of excluded referees for this period
-      const excludedRefereesQuery = `
+      // First, get the list of excluded users for this period
+      const excludedUsersQuery = `
         SELECT REFEREE_LOGIN
         FROM DEV_ALPHATEL.PRESENTATION.MLM_EXCLUSION_REFEREES_LIST
         WHERE IS_ACTIVE = TRUE
@@ -30,13 +30,22 @@ export async function GET(request: Request) {
         )
       `;
       
-      const excludedRefereesResult = await executeQuery(excludedRefereesQuery);
-      const excludedReferees = excludedRefereesResult.map(row => row.REFEREE_LOGIN);
+      const excludedUsersResult = await executeQuery(excludedUsersQuery);
+      const excludedUsers = excludedUsersResult.map(row => row.REFEREE_LOGIN);
       
-      // Build the exclusion condition
+      // Build the exclusion condition - checking both referee and referrer
       let exclusionCondition = '';
-      if (excludedReferees.length > 0) {
-        exclusionCondition = `AND RELATIVE_LEVEL_REFEREE_LOGIN NOT IN ('${excludedReferees.join("','")}')`;
+      if (excludedUsers.length > 0) {
+        // Exclude records where either:
+        // 1. The referee is in the exclusion list
+        // 2. The referrer (MEMBER_LOGIN) is in the exclusion list
+        exclusionCondition = `
+          AND (
+            RELATIVE_LEVEL_REFEREE_LOGIN NOT IN ('${excludedUsers.join("','")}')
+            AND
+            MEMBER_LOGIN NOT IN ('${excludedUsers.join("','")}')
+          )
+        `;
       }
 
       // Delete existing records for this period
@@ -48,7 +57,7 @@ export async function GET(request: Request) {
       
       await executeQuery(deleteQuery);
 
-      // Insert new records with exclusions applied
+      // Insert new records with exclusions applied to both referees and referrers
       const insertQuery = `
         INSERT INTO DEV_ALPHATEL.PRESENTATION.MLM_MKTOPS_LIST (
           START_DATE,
@@ -101,7 +110,7 @@ export async function GET(request: Request) {
     
     const finalizedData = await executeQuery(finalizedQuery);
     
-    // Get count of excluded referees
+    // Get count of excluded users
     const excludedCountQuery = `
       SELECT COUNT(*) as EXCLUDED_COUNT
       FROM DEV_ALPHATEL.PRESENTATION.MLM_EXCLUSION_REFEREES_LIST
@@ -133,7 +142,7 @@ export async function GET(request: Request) {
     const submissionInfo = submissionInfoResult.length > 0 ? {
       submittedBy: submissionInfoResult[0].SUBMITTED_BY,
       submissionDate: submissionInfoResult[0].SUBMISSION_DATE,
-      excludedRefereesCount: submissionInfoResult[0].EXCLUDED_REFEREES_COUNT,
+      excludedUsersCount: submissionInfoResult[0].EXCLUDED_REFEREES_COUNT,
       complianceVerificationDate: submissionInfoResult[0].SUBMISSION_DATE
     } : null;
     

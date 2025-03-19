@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/snowflake';
 
-// Get all excluded referees
+// Get all excluded users (both referrers and referees)
 export async function GET() {
   try {
     // First, get the basic exclusion list
@@ -60,7 +60,7 @@ export async function GET() {
   }
 }
 
-// Add a new referee to exclusion list
+// Add a new user to exclusion list (affects both as referrer and referee)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -73,22 +73,22 @@ export async function POST(request: Request) {
       );
     }
     
-    // Validate that the referee login exists in the system
-    const validateRefereeQuery = `
-      SELECT COUNT(*) AS REFEREE_COUNT
+    // Validate that the user login exists in the system
+    const validateUserQuery = `
+      SELECT COUNT(*) AS USER_COUNT
       FROM PROD_ALPHATEL.PRESENTATION.MLM_DAILY_COMMISSION
-      WHERE RELATIVE_LEVEL_REFEREE_LOGIN = '${refereeLogin}'
+      WHERE RELATIVE_LEVEL_REFEREE_LOGIN = '${refereeLogin}' OR MEMBER_LOGIN = '${refereeLogin}'
     `;
     
-    const refereeValidation = await executeQuery(validateRefereeQuery);
-    if (refereeValidation[0]?.REFEREE_COUNT === 0) {
+    const userValidation = await executeQuery(validateUserQuery);
+    if (userValidation[0]?.USER_COUNT === 0) {
       return NextResponse.json(
-        { error: 'Referee login does not exist in the system' },
+        { error: 'User login does not exist in the system' },
         { status: 400 }
       );
     }
     
-    // Check if there's already an exclusion for this referee that overlaps with the date range
+    // Check if there's already an exclusion for this user that overlaps with the date range
     const checkOverlapQuery = `
       SELECT COUNT(*) AS OVERLAP_COUNT
       FROM DEV_ALPHATEL.PRESENTATION.MLM_EXCLUSION_REFEREES_LIST
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     const overlapCheck = await executeQuery(checkOverlapQuery);
     if (overlapCheck[0]?.OVERLAP_COUNT > 0) {
       return NextResponse.json(
-        { error: 'This referee already has an active exclusion that overlaps with the specified date range' },
+        { error: 'This user already has an active exclusion that overlaps with the specified date range' },
         { status: 400 }
       );
     }

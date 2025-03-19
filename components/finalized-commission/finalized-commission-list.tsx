@@ -123,7 +123,7 @@ export default function FinalizedCommissionList() {
   const [submissionInfo, setSubmissionInfo] = useState<{
     submittedBy: string;
     submissionDate: string;
-    excludedRefereesCount: number;
+    excludedUsersCount: number;
     complianceVerificationDate?: string;
   } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -449,7 +449,7 @@ export default function FinalizedCommissionList() {
           <AlertCircle className="h-5 w-5" />
           <AlertTitle>Exclusions Applied</AlertTitle>
           <AlertDescription>
-            {excludedCount} referee{excludedCount > 1 ? 's have' : ' has'} been excluded from commission calculations.
+            {excludedCount} user{excludedCount > 1 ? 's have' : ' has'} been excluded from commission calculations (as both referrers and referees).
           </AlertDescription>
         </Alert>
       )}

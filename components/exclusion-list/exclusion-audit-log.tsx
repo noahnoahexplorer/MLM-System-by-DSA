@@ -137,7 +137,7 @@ export default function ExclusionAuditLog() {
               <Search className="h-4 w-4 text-muted-foreground" />
             </div>
             <Input
-              placeholder="Search audit logs..."
+              placeholder="Search by username, action type, or performed by..."
               value={searchQuery}
               onChange={handleSearchChange}
               className="w-full pl-8"
@@ -164,7 +164,7 @@ export default function ExclusionAuditLog() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Time</TableHead>
-                  <TableHead>Referee</TableHead>
+                  <TableHead>Username</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>By</TableHead>
                   <TableHead>Details</TableHead>

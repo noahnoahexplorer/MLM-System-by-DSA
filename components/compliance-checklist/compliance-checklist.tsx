@@ -222,7 +222,7 @@ export default function ComplianceCheckList() {
       
       if (!response.ok) {
         // Set the error message from the API and ensure it's visible
-        const errorMsg = data.error || "Failed to add referee to exclusion list";
+        const errorMsg = data.error || "Failed to add user to exclusion list";
         console.error("Error from API:", errorMsg);
         setExclusionError(errorMsg);
         
@@ -246,6 +246,7 @@ export default function ComplianceCheckList() {
       // Close the dialog
       document.getElementById('add-exclusion-trigger')?.click();
       
+      // Refresh both the exclusion list and compliance data to show updated exclusion statuses
       await fetchExclusions();
       if (selectedWeek) {
         await fetchData(selectedWeek);
@@ -253,7 +254,7 @@ export default function ComplianceCheckList() {
       
       toast({
         title: "Success",
-        description: "Referee has been added to exclusion list",
+        description: "User has been added to exclusion list",
       });
     } catch (error) {
       console.error('Error adding exclusion:', error);
@@ -359,13 +360,19 @@ export default function ComplianceCheckList() {
         excludedRef.toLowerCase() === refereeLogin?.toLowerCase()
       );
       
-      // Only add to adjusted amount if not excluded
-      if (!isRefereeExcluded) {
+      // NEW: Check if the referrer (member login) is excluded
+      const isReferrerExcluded = excludedReferees.some(excludedRef => 
+        excludedRef.toLowerCase() === memberLogin?.toLowerCase()
+      );
+      
+      // Only add to adjusted amount if neither referee nor referrer is excluded
+      const isExcluded = isRefereeExcluded || isReferrerExcluded;
+      if (!isExcluded) {
         adjustedAmount += commissionAmount;
       }
       
       // Aggregate by member login (only non-excluded)
-      if (!isRefereeExcluded) {
+      if (!isExcluded) {
         if (!memberCommissions[memberLogin]) {
           memberCommissions[memberLogin] = {
             totalCommission: 0,
@@ -442,6 +449,11 @@ export default function ComplianceCheckList() {
       const adjustedCommission = memberTotals[memberLogin]?.adjustedTotal || 0;
       
       rows.forEach((row: any, index: number) => {
+        // Check if this member is excluded as either a referrer or referee
+        const isRefereeExcluded = excludedReferees.includes(row.RELATIVE_LEVEL_REFEREE_LOGIN);
+        const isReferrerExcluded = excludedReferees.includes(row.MEMBER_LOGIN);
+        const isExcluded = isRefereeExcluded || isReferrerExcluded;
+        
         const rowData = [
           `"${row.MEMBER_LOGIN}"`,
           `"${row.MEMBER_NAME || ''}"`,
@@ -450,7 +462,7 @@ export default function ComplianceCheckList() {
           `"${row.MEMBER_GROUP || ''}"`,
           `"${row.RELATIVE_LEVEL || ''}"`,
           `"${row.RELATIVE_LEVEL_REFEREE_LOGIN || ''}"`,
-          `"${row.IS_EXCLUDED ? 'Yes' : 'No'}"`,
+          `"${isExcluded ? 'Yes' : 'No'}"`,
           `"${row.TOTAL_DEPOSIT_AMOUNT || 0}"`,
           `"${row.TOTAL_WIN_LOSS || 0}"`,
           `"${row.TOTAL_VALID_TURNOVER || 0}"`,
@@ -597,15 +609,21 @@ export default function ComplianceCheckList() {
     ];
     
     const csvContent = allData.map(row => {
-      const isExcluded = excludedReferees.includes(row.RELATIVE_LEVEL_REFEREE_LOGIN);
+      const isRefereeExcluded = excludedReferees.includes(row.RELATIVE_LEVEL_REFEREE_LOGIN);
+      const isReferrerExcluded = excludedReferees.includes(row.MEMBER_LOGIN);
+      const isExcluded = isRefereeExcluded || isReferrerExcluded;
+      
+      const exclusionNote = isRefereeExcluded ? ' (referee excluded)' : 
+                           isReferrerExcluded ? ' (referrer excluded)' : '';
+      
       return [
-        row.MEMBER_LOGIN,
+        `${row.MEMBER_LOGIN}${isReferrerExcluded ? ' (excluded)' : ''}`,
         row.MEMBER_NAME,
         new Date(row.START_DATE).toISOString().split('T')[0],
         new Date(row.END_DATE).toISOString().split('T')[0],
         row.MEMBER_GROUP,
         row.RELATIVE_LEVEL,
-        `${row.RELATIVE_LEVEL_REFEREE_LOGIN}${isExcluded ? ' (excluded)' : ''}`,
+        `${row.RELATIVE_LEVEL_REFEREE_LOGIN}${isRefereeExcluded ? ' (excluded)' : ''}`,
         (row.TOTAL_DEPOSIT_AMOUNT || 0).toFixed(2),
         (row.TOTAL_WIN_LOSS || 0).toFixed(2),
         (row.TOTAL_VALID_TURNOVER || 0).toFixed(2),
@@ -761,9 +779,9 @@ export default function ComplianceCheckList() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Add Referee to Exclusion List</DialogTitle>
+                <DialogTitle>Add User to Exclusion List</DialogTitle>
                 <DialogDescription>
-                  Excluded referees will not contribute to commission calculations.
+                  Excluded users will not participate in commission calculations as either referrers or referees.
                 </DialogDescription>
               </DialogHeader>
               
@@ -778,7 +796,7 @@ export default function ComplianceCheckList() {
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="referee-login" className="text-right">
-                    Referee Login
+                    Username
                   </Label>
                   <Input
                     id="referee-login"
@@ -972,20 +990,27 @@ export default function ComplianceCheckList() {
             {filteredData.map((row, index) => {
               // Check if this row's referee is in the excluded list
               const refereeLogin = row.RELATIVE_LEVEL_REFEREE_LOGIN;
+              const memberLogin = row.MEMBER_LOGIN;
               
               const isRefereeExcluded = excludedReferees.some(excludedRef => 
                 excludedRef.toLowerCase() === refereeLogin?.toLowerCase()
               );
               
+              const isReferrerExcluded = excludedReferees.some(excludedRef => 
+                excludedRef.toLowerCase() === memberLogin?.toLowerCase()
+              );
+              
+              const isExcluded = isRefereeExcluded || isReferrerExcluded;
+              
               return (
                 <TableRow 
                   key={`${row.MEMBER_LOGIN}-${index}`}
-                  className={isRefereeExcluded ? "bg-red-50 dark:bg-red-950/10" : ""}
+                  className={isExcluded ? "bg-red-50 dark:bg-red-950/10" : ""}
                 >
                   <TableCell>
                     {row.MEMBER_LOGIN}
-                    {isRefereeExcluded && (
-                      <span className="ml-2 text-xs text-red-500">•</span>
+                    {isReferrerExcluded && (
+                      <span className="ml-2 text-xs text-red-500">(excluded)</span>
                     )}
                   </TableCell>
                   <TableCell>{row.MEMBER_NAME || '-'}</TableCell>
@@ -1011,11 +1036,11 @@ export default function ComplianceCheckList() {
                   <TableCell className="text-right">
                     {((row.COMMISSION_RATE || 0) * 100).toFixed(2)}%
                   </TableCell>
-                  <TableCell className={`text-right ${isRefereeExcluded ? "text-red-500" : ""}`}>
+                  <TableCell className={`text-right ${isExcluded ? "text-red-500" : ""}`}>
                     {formatCurrency(row.LOCAL_COMMISSION_AMOUNT || 0, row.MEMBER_CURRENCY)}
                   </TableCell>
                   <TableCell>
-                    {isRefereeExcluded ? "YES" : "NO"}
+                    {isExcluded ? "YES" : "NO"}
                   </TableCell>
                 </TableRow>
               );
