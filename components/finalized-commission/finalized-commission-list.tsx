@@ -323,10 +323,13 @@ export default function FinalizedCommissionList() {
       const result = await response.json();
       const memberData = result.members || [];
       
-      // Create lookup map for member IDs
-      const memberIdMap = new Map();
-      memberData.forEach((member: { MEMBER_LOGIN: string, MEMBER_ID: string }) => {
-        memberIdMap.set(member.MEMBER_LOGIN, member.MEMBER_ID);
+      // Create lookup map for member IDs and groups
+      const memberMap = new Map();
+      memberData.forEach((member: { MEMBER_LOGIN: string, MEMBER_ID: string, MEMBER_GROUP: string }) => {
+        memberMap.set(member.MEMBER_LOGIN, {
+          MEMBER_ID: member.MEMBER_ID,
+          MEMBER_GROUP: member.MEMBER_GROUP || ''
+        });
       });
 
       // Create CSV content
@@ -334,9 +337,10 @@ export default function FinalizedCommissionList() {
       const BOM = '\uFEFF';
       csvContent += BOM;
 
-      // Add headers - Include MEMBER_ID first, then all standard columns
+      // Add headers - Include MEMBER_ID and MEMBER_GROUP first, then all standard columns
       const headers = [
         'MEMBER_ID',
+        'MEMBER_GROUP',
         'memberLogin',
         'startTime',
         'endTime',
@@ -352,7 +356,7 @@ export default function FinalizedCommissionList() {
 
       // Add data rows with proper CSV formatting - Include all standard columns
       filteredData.forEach(row => {
-        const memberId = memberIdMap.get(row.MEMBER_LOGIN) || '';
+        const memberInfo = memberMap.get(row.MEMBER_LOGIN) || { MEMBER_ID: '', MEMBER_GROUP: '' };
         
         // Format dates as MM/DD/YYYY
         const formatDateToMMDDYYYY = (dateStr: string) => {
@@ -367,7 +371,8 @@ export default function FinalizedCommissionList() {
         const formattedEndDate = formatDateToMMDDYYYY(adjustedEndDate);
         
         const rowData = [
-          `"${memberId}"`,
+          `"${memberInfo.MEMBER_ID}"`,
+          `"${memberInfo.MEMBER_GROUP}"`,
           `"${row.MEMBER_LOGIN}"`,
           `"${formattedStartDate}"`,
           `"${formattedEndDate}"`,

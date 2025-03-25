@@ -19,11 +19,12 @@ export async function GET(request: Request) {
     const memberQuery = `
       SELECT 
         MEMBER_LOGIN,
-        MEMBER_ID
+        MEMBER_ID,
+        MEMBER_GROUP
       FROM PROD_ALPHATEL.PRESENTATION.VIEW_MLM_DAILY_COMMISSION
       WHERE DATE(START_DATE) = '${startDate}'
       AND DATE(END_DATE) = '${endDate}'
-      GROUP BY MEMBER_LOGIN, MEMBER_ID
+      GROUP BY MEMBER_LOGIN, MEMBER_ID, MEMBER_GROUP
     `;
     
     const memberData = await executeQuery(memberQuery);
