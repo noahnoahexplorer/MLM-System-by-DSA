@@ -308,6 +308,9 @@ export default function FinalizedCommissionList() {
       // Get date range from selected week
       const [startDate, endDate] = selectedWeek.split('_');
       
+      // Get adjusted dates
+      const { adjustedStartDate, adjustedEndDate } = getAdjustedDates(startDate, endDate);
+      
       // Fetch member data with IDs
       const response = await fetch(
         `/api/finalized-commission/member-id?startDate=${startDate}&endDate=${endDate}`
@@ -331,20 +334,50 @@ export default function FinalizedCommissionList() {
       const BOM = '\uFEFF';
       csvContent += BOM;
 
-      // Add headers - ONLY MEMBER_ID and memberLogin
+      // Add headers - Include MEMBER_ID first, then all standard columns
       const headers = [
         'MEMBER_ID',
-        'memberLogin'
+        'memberLogin',
+        'startTime',
+        'endTime',
+        'amount',
+        'rewardName',
+        'description',
+        'category',
+        'categoryTitle',
+        '1xturnover',
+        'multiplier'
       ];
       csvContent += headers.join(',') + '\n';
 
-      // Add data rows with proper CSV formatting - ONLY MEMBER_ID and memberLogin
+      // Add data rows with proper CSV formatting - Include all standard columns
       filteredData.forEach(row => {
         const memberId = memberIdMap.get(row.MEMBER_LOGIN) || '';
         
+        // Format dates as MM/DD/YYYY
+        const formatDateToMMDDYYYY = (dateStr: string) => {
+          const date = new Date(dateStr);
+          const month = (date.getMonth() + 1).toString().padStart(2, '0');
+          const day = date.getDate().toString().padStart(2, '0');
+          const year = date.getFullYear();
+          return `${month}/${day}/${year}`;
+        };
+
+        const formattedStartDate = formatDateToMMDDYYYY(adjustedStartDate);
+        const formattedEndDate = formatDateToMMDDYYYY(adjustedEndDate);
+        
         const rowData = [
           `"${memberId}"`,
-          `"${row.MEMBER_LOGIN}"`
+          `"${row.MEMBER_LOGIN}"`,
+          `"${formattedStartDate}"`,
+          `"${formattedEndDate}"`,
+          row.TOTAL_COMMISSION,
+          '"Referral Program"',
+          '"Referral rewards made special – enjoy this angpao!"',
+          '"Commission"',
+          '"MLM Referral Program Weekly Commission"',
+          '"no"',
+          ''
         ];
         csvContent += rowData.join(',') + '\n';
       });
@@ -357,7 +390,7 @@ export default function FinalizedCommissionList() {
       if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `member_ids_${selectedWeek}.csv`);
+        link.setAttribute('download', `finalized_commission_with_member_ids_${selectedWeek}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
