@@ -18,14 +18,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DollarSign, Users, TrendingUp, ArrowUpRight, ChevronUp, ChevronDown } from "lucide-react";
+import { DollarSign, Users, TrendingUp, ArrowUpRight, ChevronUp, ChevronDown, Info } from "lucide-react";
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   BarChart,
   Bar,
@@ -35,10 +35,15 @@ import {
   PieChart,
   Pie,
   Cell,
-  LabelList,
-  TooltipProps
+  LabelList
 } from "recharts";
 import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface CommissionReport {
   month: string;
@@ -75,6 +80,30 @@ interface ComparisonData {
   totalTurnover: number;
   totalNGR: number;
   averageCommission: number;
+}
+
+interface RefereeActivityData {
+  month: string;
+  monthDate: string;
+  totalDeposit: number;
+  totalWithdrawal: number;
+  totalBonusAmount: number;
+  totalReward: number;
+  totalValidTurnover: number;
+  ngr: number;
+  activeReferees: number;
+}
+
+// Add ExpandableRow interface to track which months are expanded
+interface RefereeRowData {
+  refereeId: string;
+  refereeLogin: string;
+  totalDeposit: number;
+  totalWithdrawal: number;
+  totalBonusAmount: number;
+  totalReward: number;
+  totalValidTurnover: number;
+  ngr: number;
 }
 
 const CHART_COLORS = {
@@ -142,11 +171,108 @@ export default function ReportsOverview() {
   const [reportData, setReportData] = useState<CommissionReport | null>(null);
   const [monthlyTrends, setMonthlyTrends] = useState<TrendData[]>([]);
   const [comparisonData, setComparisonData] = useState<ComparisonData[]>([]);
+  const [refereeActivityData, setRefereeActivityData] = useState<RefereeActivityData[]>([]);
+  const [expandedMonths, setExpandedMonths] = useState<{[key: string]: boolean}>({});
+  const [refereeDetails, setRefereeDetails] = useState<{[key: string]: RefereeRowData[]}>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
+  const fetchReportData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `/api/reports/commission?year=${selectedYear}&month=${selectedMonth}&view=monthly`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('API Response:', data); // For debugging
+      
+      setReportData(data.report);
+      setMonthlyTrends(data.trends || []);
+      setComparisonData(data.comparison || []);
+    } catch (error) {
+      console.error("Error fetching report data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRefereeActivityData = async () => {
+    try {
+      const response = await fetch(
+        `/api/reports/referee-activity?year=${selectedYear}&month=${selectedMonth}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Referee Activity API Response:', data); // For debugging
+      
+      // Sort data chronologically by month
+      const sortedData = [...(data.monthly || [])].sort((a, b) => 
+        new Date(a.monthDate).getTime() - new Date(b.monthDate).getTime()
+      );
+      
+      setRefereeActivityData(sortedData);
+    } catch (error) {
+      console.error("Error fetching referee activity data:", error);
+    }
+  };
+
+  // Add new function to fetch referee details for a specific month
+  const fetchRefereeDetails = async (month: string, monthDate: string) => {
+    try {
+      // Parse the month date to get year and month
+      const date = new Date(monthDate);
+      const year = date.getFullYear().toString();
+      const monthNum = (date.getMonth() + 1).toString().padStart(2, '0');
+      
+      const response = await fetch(
+        `/api/reports/referee-details?year=${year}&month=${monthNum}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Referee Details API Response:', data); // For debugging
+      
+      setRefereeDetails(prev => ({
+        ...prev,
+        [month]: data.referees || []
+      }));
+    } catch (error) {
+      console.error("Error fetching referee details:", error);
+    }
+  };
+  
+  // Add function to toggle expanded state
+  const toggleMonthExpand = (month: string, monthDate: string) => {
+    setExpandedMonths(prev => {
+      const newState = {
+        ...prev,
+        [month]: !prev[month]
+      };
+      
+      // If expanding and we don't have details yet, fetch them
+      if (newState[month] && (!refereeDetails[month] || refereeDetails[month].length === 0)) {
+        fetchRefereeDetails(month, monthDate);
+      }
+      
+      return newState;
+    });
+  };
+
   useEffect(() => {
     fetchReportData();
+    fetchRefereeActivityData();
   }, [selectedYear, selectedMonth]);
 
   useEffect(() => {
@@ -180,30 +306,6 @@ export default function ReportsOverview() {
       }
     }
   }, [reportData, monthlyTrends, selectedYear, selectedMonth]);
-
-  const fetchReportData = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `/api/reports/commission?year=${selectedYear}&month=${selectedMonth}&view=monthly`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`API responded with status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('API Response:', data); // For debugging
-      
-      setReportData(data.report);
-      setMonthlyTrends(data.trends || []);
-      setComparisonData(data.comparison || []);
-    } catch (error) {
-      console.error("Error fetching report data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -487,7 +589,7 @@ export default function ReportsOverview() {
                       tick={{ fill: CHART_COLORS.text, fontSize: CHART_STYLES.fontSize.small }}
                       axisLine={{ stroke: CHART_COLORS.grid }}
                     />
-                    <Tooltip 
+                    <RechartsTooltip 
                       contentStyle={CHART_STYLES.tooltip}
                       labelStyle={{ color: CHART_COLORS.text, fontWeight: 600 }}
                       formatter={(value, name) => [
@@ -538,7 +640,15 @@ export default function ReportsOverview() {
             <CardContent>
               <div className="h-[400px] w-full">
                 <ResponsiveContainer>
-                  <ComposedChart data={comparisonData}>
+                  <ComposedChart data={comparisonData.map((item, index) => {
+                    // Find matching referee data for this month
+                    const refereeData = refereeActivityData.find(data => data.month === item.month);
+                    return {
+                      ...item,
+                      // Use NGR from referee data if available, otherwise fallback to original
+                      totalNGR: refereeData ? refereeData.ngr : item.totalNGR
+                    };
+                  })}>
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
                     <XAxis 
                       dataKey="month" 
@@ -558,7 +668,7 @@ export default function ReportsOverview() {
                       orientation="right" 
                       stroke={CHART_COLORS.secondary}
                     />
-                    <Tooltip 
+                    <RechartsTooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
@@ -566,8 +676,8 @@ export default function ReportsOverview() {
                             <div className="bg-white p-4 rounded-md shadow-md border border-gray-200">
                               <p className="font-bold">{new Date(data.month).toLocaleDateString('default', { month: 'long', year: 'numeric' })}</p>
                               <p className="text-purple-500">Commission : {data.totalCommission.toFixed(1)}</p>
-                              {/* Negate NGR for company perspective */}
-                              <p className="text-amber-500">NGR : {(-data.totalNGR).toFixed(2)}</p>
+                              {/* Show NGR without negation */}
+                              <p className="text-amber-500">NGR : {data.totalNGR.toFixed(2)}</p>
                               <p className="text-green-500">Referees : {data.uniqueReferees}</p>
                             </div>
                           );
@@ -582,10 +692,10 @@ export default function ReportsOverview() {
                       name="Commission" 
                       fill={CHART_COLORS.primary} 
                     />
-                    {/* For the NGR bar, negate the value for company perspective */}
+                    {/* For the NGR bar, display without negation */}
                     <Bar 
                       yAxisId="left" 
-                      dataKey={(data) => -data.totalNGR} 
+                      dataKey="totalNGR" 
                       name="NGR" 
                       fill={CHART_COLORS.tertiary} 
                     />
@@ -619,7 +729,7 @@ export default function ReportsOverview() {
                       <YAxis 
                         tickFormatter={(value) => formatYAxisDynamic(value)} 
                       />
-                      <Tooltip 
+                      <RechartsTooltip 
                         formatter={(value) => formatCurrency(Number(value))}
                         labelFormatter={(value: string) => new Date(value).toLocaleDateString('default', { year: 'numeric', month: 'long' })}
                       />
@@ -645,12 +755,12 @@ export default function ReportsOverview() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Referral Performance</CardTitle>
+                <CardTitle>Referee Performance</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer>
-                    <ComposedChart data={comparisonData}>
+                    <ComposedChart data={refereeActivityData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
                       <XAxis 
                         dataKey="month" 
@@ -661,13 +771,10 @@ export default function ReportsOverview() {
                         tickFormatter={(value) => formatYAxisDynamic(value)} 
                       />
                       <YAxis yAxisId="right" orientation="right" />
-                      <Tooltip 
-                        formatter={(value, name: string) => {
-                          if (name === "Deposits" || name === "Turnover") {
-                            return [formatCurrency(Number(value)), name];
-                          }
-                          if (name === "NGR") {
-                            return [formatNGR(Number(value)), name];
+                      <RechartsTooltip 
+                        formatter={(value: number, name: string) => {
+                          if (name === "Deposits" || name === "NGR") {
+                            return [formatCurrency(value), name];
                           }
                           return [value, name];
                         }}
@@ -676,15 +783,21 @@ export default function ReportsOverview() {
                       <Legend />
                       <Bar 
                         yAxisId="left" 
-                        dataKey="totalDeposits" 
+                        dataKey="totalDeposit" 
                         name="Deposits" 
                         fill={CHART_COLORS.tertiary} 
+                      />
+                      <Bar 
+                        yAxisId="left" 
+                        dataKey="ngr" 
+                        name="NGR" 
+                        fill={CHART_COLORS.primary} 
                       />
                       <Line
                         yAxisId="right" 
                         type="monotone" 
-                        dataKey="uniqueReferees" 
-                        name="Referees" 
+                        dataKey="activeReferees" 
+                        name="Active Referees" 
                         stroke={CHART_COLORS.secondary} 
                       />
                     </ComposedChart>
@@ -696,7 +809,22 @@ export default function ReportsOverview() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Monthly Performance Data</CardTitle>
+              <div className="flex items-center space-x-2">
+                <CardTitle>Monthly Commission Data</CardTitle>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="inline-flex items-center justify-center rounded-full w-5 h-5 text-muted-foreground hover:text-foreground hover:bg-muted">
+                        <Info className="h-3.5 w-3.5" />
+                        <span className="sr-only">Info</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p>Transactions occurring between March 31, 2025, and April 6, 2025, are included in the March 2025 data, as the data is categorized by week, and this week falls within March.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -707,29 +835,181 @@ export default function ReportsOverview() {
                       <TableHead>Commission</TableHead>
                       <TableHead>Referees</TableHead>
                       <TableHead>Avg Commission</TableHead>
-                      <TableHead>NGR</TableHead>
-                      <TableHead>Growth</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {comparisonData.map((month, index) => {
-                      const prevMonth = index > 0 ? comparisonData[index - 1] : null;
-                      const growth = prevMonth ? calculateGrowthPercentage(month.totalNGR, prevMonth.totalNGR) : 0;
-                      
                       return (
                         <TableRow key={month.month}>
                           <TableCell>{new Date(month.month).toLocaleDateString('default', { year: 'numeric', month: 'long' })}</TableCell>
                           <TableCell>{formatCurrency(month.totalCommission)}</TableCell>
                           <TableCell>{month.uniqueReferees}</TableCell>
                           <TableCell>{formatCurrency(month.averageCommission)}</TableCell>
-                          <TableCell>{formatNGR(month.totalNGR)}</TableCell>
-                          <TableCell className={growth >= 0 ? "text-green-500" : "text-red-500"}>
-                            <div className="flex items-center">
-                              {growth >= 0 ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-                              {Math.abs(growth).toFixed(1)}%
-                            </div>
-                          </TableCell>
                         </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Referee Activity Table - Update to show monthly data */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <CardTitle>Referee Performance Data</CardTitle>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="inline-flex items-center justify-center rounded-full w-5 h-5 text-muted-foreground hover:text-foreground hover:bg-muted">
+                        <Info className="h-3.5 w-3.5" />
+                        <span className="sr-only">Info</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p>This table displays aggregated referee activity metrics by month. Click on a month row to see individual referee performance for that period.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Month</TableHead>
+                      <TableHead>Deposits</TableHead>
+                      <TableHead>Withdrawals</TableHead>
+                      <TableHead>Bonus Amount</TableHead>
+                      <TableHead>Rewards</TableHead>
+                      <TableHead>Valid Turnover</TableHead>
+                      <TableHead>NGR</TableHead>
+                      <TableHead>Active Referees</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {refereeActivityData.map((data, index) => {
+                      // Get previous month data for trend indicators
+                      const prevMonthData = index > 0 ? refereeActivityData[index - 1] : null;
+                      
+                      // Calculate trends
+                      const depositTrend = prevMonthData ? data.totalDeposit - prevMonthData.totalDeposit : 0;
+                      const ngrTrend = prevMonthData ? data.ngr - prevMonthData.ngr : 0;
+                      const refereeTrend = prevMonthData ? data.activeReferees - prevMonthData.activeReferees : 0;
+                      
+                      return (
+                        <>
+                          <TableRow 
+                            key={data.month} 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => toggleMonthExpand(data.month, data.monthDate)}
+                          >
+                            <TableCell className="font-medium">
+                              <div className="flex items-center">
+                                {expandedMonths[data.month] ? 
+                                  <ChevronDown className="mr-2 h-4 w-4" /> : 
+                                  <ChevronUp className="mr-2 h-4 w-4 rotate-180" />
+                                }
+                                {new Date(data.monthDate).toLocaleDateString('default', { year: 'numeric', month: 'long' })}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                {formatCurrency(data.totalDeposit)}
+                                {prevMonthData && (
+                                  <span className={`ml-2 ${depositTrend >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {depositTrend >= 0 ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{formatCurrency(data.totalWithdrawal)}</TableCell>
+                            <TableCell>{formatCurrency(data.totalBonusAmount)}</TableCell>
+                            <TableCell>{formatCurrency(data.totalReward)}</TableCell>
+                            <TableCell>{formatCurrency(data.totalValidTurnover)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                {formatCurrency(data.ngr)}
+                                {prevMonthData && (
+                                  <span className={`ml-2 ${ngrTrend >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {ngrTrend >= 0 ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                {data.activeReferees}
+                                {prevMonthData && (
+                                  <span className={`ml-2 ${refereeTrend >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {refereeTrend >= 0 ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          
+                          {/* Expanded referee details */}
+                          {expandedMonths[data.month] && (
+                            <>
+                              <TableRow className="bg-muted/20">
+                                <TableCell colSpan={8} className="p-0">
+                                  <div className="p-2">
+                                    <div className="rounded-md border">
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Referee</TableHead>
+                                            <TableHead>Deposits</TableHead>
+                                            <TableHead>Withdrawals</TableHead>
+                                            <TableHead>Bonus Amount</TableHead>
+                                            <TableHead>Rewards</TableHead>
+                                            <TableHead>Valid Turnover</TableHead>
+                                            <TableHead>NGR</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {refereeDetails[data.month] ? (
+                                            refereeDetails[data.month].length > 0 ? (
+                                              refereeDetails[data.month].map(referee => (
+                                                <TableRow key={referee.refereeId}>
+                                                  <TableCell>{referee.refereeLogin}</TableCell>
+                                                  <TableCell>{formatCurrency(referee.totalDeposit)}</TableCell>
+                                                  <TableCell>{formatCurrency(referee.totalWithdrawal)}</TableCell>
+                                                  <TableCell>{formatCurrency(referee.totalBonusAmount)}</TableCell>
+                                                  <TableCell>{formatCurrency(referee.totalReward)}</TableCell>
+                                                  <TableCell>{formatCurrency(referee.totalValidTurnover)}</TableCell>
+                                                  <TableCell>{formatCurrency(referee.ngr)}</TableCell>
+                                                </TableRow>
+                                              ))
+                                            ) : (
+                                              <TableRow>
+                                                <TableCell colSpan={7} className="text-center py-4">
+                                                  No referee data available for this month
+                                                </TableCell>
+                                              </TableRow>
+                                            )
+                                          ) : (
+                                            <TableRow>
+                                              <TableCell colSpan={7} className="text-center py-4">
+                                                <div className="flex justify-center">
+                                                  <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                                  <span className="ml-2">Loading referee details...</span>
+                                                </div>
+                                              </TableCell>
+                                            </TableRow>
+                                          )}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            </>
+                          )}
+                        </>
                       );
                     })}
                   </TableBody>
