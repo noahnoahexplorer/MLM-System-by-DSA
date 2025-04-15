@@ -21,12 +21,11 @@ interface CommissionData {
   MEMBER_ID: string;
   MEMBER_LOGIN: string;
   MEMBER_CURRENCY: string;
-  RELATIVE_LEVEL: number;
-  RELATIVE_LEVEL_REFEREE_LOGIN: string;
   TOTAL_COMMISSION: number;
   REFEREE_DEPOSIT: number;
   REFEREE_TURNOVER: number;
   REFEREE_WIN_LOSS: number;
+  REFEREE_LOGINS: string;
 }
 
 interface DetailedCommissionData {
@@ -142,6 +141,7 @@ export default function MembersList() {
         row.START_DATE,
         row.END_DATE
       );
+      
       setDetailedData(details || []);
     } catch (error) {
       console.error('Error loading details:', error);
@@ -150,25 +150,34 @@ export default function MembersList() {
   };
 
   const calculateMemberSummary = (data: CommissionData[]): MemberSummary => {
-    const uniqueRefereesByLevel = new Map<number, Set<string>>();
+    // Set to track unique referee usernames
+    const uniqueReferees = new Set<string>();
     
-    return data.reduce((summary, row) => {
-      if (row.RELATIVE_LEVEL_REFEREE_LOGIN) {
-        // Initialize Set for this level if it doesn't exist
-        if (!uniqueRefereesByLevel.has(row.RELATIVE_LEVEL)) {
-          uniqueRefereesByLevel.set(row.RELATIVE_LEVEL, new Set());
-        }
-        // Add referee to the appropriate level set
-        uniqueRefereesByLevel.get(row.RELATIVE_LEVEL)?.add(row.RELATIVE_LEVEL_REFEREE_LOGIN);
+    // Process each row
+    data.forEach(row => {
+      if (row.REFEREE_LOGINS) {
+        // First split by pipe (between different referee login groups)
+        const loginGroups = row.REFEREE_LOGINS.split('|');
+        
+        loginGroups.forEach(group => {
+          // Then split each group by colon (which separates individual usernames)
+          const usernames = group.split(':');
+          
+          // Add each individual username to the set
+          usernames.forEach(username => {
+            if (username.trim()) {
+              uniqueReferees.add(username.trim());
+            }
+          });
+        });
       }
-
-      // Count total unique referees across all levels
-      const totalUniqueReferees = Array.from(uniqueRefereesByLevel.values())
-        .reduce((total, set) => total + set.size, 0);
-
+    });
+    
+    // Sum up other values
+    return data.reduce((summary, row) => {
       return {
         totalCommission: summary.totalCommission + (row.TOTAL_COMMISSION || 0),
-        uniqueReferees: totalUniqueReferees,
+        uniqueReferees: uniqueReferees.size, // Use the size of our Set
         totalDeposit: summary.totalDeposit + (row.REFEREE_DEPOSIT || 0),
         totalTurnover: summary.totalTurnover + (row.REFEREE_TURNOVER || 0),
         totalWinLoss: summary.totalWinLoss + (row.REFEREE_WIN_LOSS || 0),
